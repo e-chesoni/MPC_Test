@@ -25,27 +25,34 @@ import quadrotor
 from quadrotor import Quadrotor
 from quad_sim import simulate_quadrotor
 
+import skid_steer
+import skid_steer_animation
+from skid_steer import SkidSteerVehicle
+from skid_steer_sim import simulate_skid_steer
+
 # Need to reload the module to use the latest code
 importlib.reload(quadrotor)
 importlib.reload(create_animation)
 
 # Global variables
-tf = 10;
+tf = 10
+
 
 def create_quadrotor():
     """
     Load in the animation function
     """
     # Weights of LQR cost
-    R = np.eye(2);
-    Q = np.diag([10, 10, 1, 1, 1, 1]);
-    Qf = Q;
+    R = np.eye(2)
+    Q = np.diag([10, 10, 1, 1, 1, 1])
+    Qf = Q
 
     # End time of the simulation
 
     # Construct our quadrotor controller
-    quadrotor = Quadrotor(Q, R, Qf);
+    quadrotor = Quadrotor(Q, R, Qf)
     return quadrotor
+
 def simulate_quadrotor_MPC(quadrotor, tf):
     # Set quadrotor's initial state and simulate
     x0 = np.array([0.5, 0.5, 0, 1, 1, 0])
@@ -55,8 +62,40 @@ def simulate_quadrotor_MPC(quadrotor, tf):
     plt.show()
     return anim, fig
 
+def create_skid_steer():
+    """
+    Load in the animation function
+    """
+    # Weights of LQR cost
+    R = np.eye(3) * 0.5
+    Q = np.diag([10, 10, 1])
+    Qf = Q
+
+    # End time of the simulation
+
+    # Construct our skid steer controller
+    skid_steer = SkidSteerVehicle(Q, R, Qf)
+    return skid_steer
+def simulate_skid_steer_MPC(skid_steer, tf):
+    # Set skid steer's initial state and simulate
+    x0 = np.array([2, 2, 3]) # THIS WORKS (anything between 3 - 20 seems to get to target)
+    # Run MPC
+    #x, u, t = simulate_skid_steer(x0, tf, skid_steer)
+
+    # Run LQR
+    x, u, t = simulate_skid_steer(x0, tf, skid_steer, False)
+
+    anim, fig = skid_steer_animation.create_animation(x, tf)
+    plt.show()
+    return anim, fig
+
 
 if __name__ == '__main__':
+    '''
     q = create_quadrotor()
     anim, fig = simulate_quadrotor_MPC(q, 10)
+    '''
+    s = create_skid_steer()
+    anim, fig = simulate_skid_steer_MPC(s, 10)
+
     print("done")

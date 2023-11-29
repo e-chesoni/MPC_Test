@@ -17,35 +17,53 @@ from pydrake.all import MonomialBasis, OddDegreeMonomialBasis, Variables
 
 
 class SkidSteerVehicle(object):
-    def __init__(self, Q, R, Qf, umin, umax, a, I, m):
+    def __init__(self, Q, R, Qf):
         print("Init SkidSteerVehicle...")
+        # TODO: Kinematic model parameters to tweak
+        '''
+        self.alpha_l = 0.9464
+        self.alpha_r = 0.9253
+        self.x_ICR_l = -0.2758
+        self.x_ICR_r = 0.2998
+        self.y_ICR_v = -0.0080
+        '''
+        self.alpha_l = 1
+        self.alpha_r = 9
+        self.x_ICR_l = -2
+        self.x_ICR_r = 2
+        self.y_ICR_v = -0.08
 
         self.Q = Q
         self.R = R
         self.Qf = Qf
 
         # Input limits
-        self.umin = umin
-        self.umax = umax
+        self.umin = 1  # should be 0; no movement though. moves with 1
+        self.umax = 5
 
         # Vehicle parameters
-        self.a = a  # Distance from the center of mass to the wheel
-        self.I = I  # Moment of inertia
-        self.m = m  # Mass
+        '''
+        self.a = 4  # Distance from the center of mass to the wheel
+        self.length = 4.2
+        self.width = 3.1
+        self.m = 2  # Mass
+        self.I = (1/12) * self.m * (self.length**2 + self.width**2)  # Moment of inertia
+        '''
 
-        self.n_x = 6  # number of states
+        # State and input totals
+        self.n_x = 3  # number of states
         self.n_u = 2  # number of control inputs
 
     def x_d(self):
         # Nominal state
-        return np.array([0, 0, 0, 0, 0, 0])
+        return np.array([0, 0, 0])
 
     def u_d(self):
         # Nominal input
-        return np.array([self.m * self.g / 2, self.m * self.g / 2])
+        return np.array([0, 0, 0])
 
     # Continuous-time dynamics for the skid-steer vehicle
-    def continuous_time_full_dynamics(self, x, u, alpha_l, alpha_r):
+    def continuous_time_full_dynamics(self, x, u):
         # TODO: verify continuous time dynamics calculation for skid steer
         # Get state variables
         v_x, v_y, w_z = x[0], x[1], x[2]
@@ -53,58 +71,69 @@ class SkidSteerVehicle(object):
 
         # Parameters from the kinematic model
         x_ICR_v = -v_y / w_z
-        x_ICR_l = (alpha_l * V_l - v_y) / w_z
-        x_ICR_r = (alpha_r * V_r - v_y) / w_z
+        x_ICR_l = (self.alpha_l * V_l - v_y) / w_z
+        x_ICR_r = (self.alpha_r * V_r - v_y) / w_z
         y_ICR_v = y_ICR_l = y_ICR_r = v_x / w_z
 
-        # Calculate continuous-time dynamics
+        # Calculate continuous-time dynamics for global system
         xdot = v_x * cos(x[2]) - v_y * sin(x[2])
         ydot = v_x * sin(x[2]) + v_y * cos(x[2])
-        wdot = (V_r - V_l) / (x_ICR_r - x_ICR_l) * (-alpha_l + alpha_r)
+        wdot = (V_r - V_l) / (x_ICR_r - x_ICR_l) * (-self.alpha_l + self.alpha_r)
 
+        # TODO: Verify this is not needed; state vector = position vector = 3x1
         # Update the state derivatives
-        v_xdot = -v_y / (x_ICR_r - x_ICR_l) * (-y_ICR_v * alpha_l * V_l + y_ICR_v * alpha_r * V_r)
-        v_ydot = -v_y / (x_ICR_r - x_ICR_l) * (x_ICR_r * alpha_l * V_l - x_ICR_l * alpha_r * V_r)
-        w_zdot = -v_y / (x_ICR_r - x_ICR_l) * (-alpha_l * V_l + alpha_r * V_r)
+        #v_xdot = -v_y / (x_ICR_r - x_ICR_l) * (-y_ICR_v * self.alpha_l * V_l + y_ICR_v * self.alpha_r * V_r)
+        #v_ydot = -v_y / (x_ICR_r - x_ICR_l) * (x_ICR_r * self.alpha_l * V_l - x_ICR_l * self.alpha_r * V_r)
+        #w_zdot = -v_y / (x_ICR_r - x_ICR_l) * (-self.alpha_l * V_l + self.alpha_r * V_r)
 
-        xdot = np.array([v_xdot, v_ydot, wdot, xdot, ydot, w_zdot])
-        return xdot
+        fxu = np.array([xdot, ydot, wdot])
+        return fxu
 
-    # Helper to compute A matrix
-    def compute_A_matrix(self, V_l, V_r, alpha_l, alpha_r, v_x, v_y, w_z):
+    # Helper to compute B matrix
+    # CALLED A in PAPER
+    def compute_B_matrix(self, V_l, V_r, alpha_l, alpha_r, v_x, v_y, w_z):
         # Compute A matrix based on provided dynamics
         x_ICR_v = -v_y / w_z
         x_ICR_l = (alpha_l * V_l - v_y) / w_z
         x_ICR_r = (alpha_r * V_r - v_y) / w_z
         y_ICR_v = y_ICR_l = y_ICR_r = v_x / w_z
 
-        A = 1 / (x_ICR_r - x_ICR_l) * np.array([
+        B = 1 / (x_ICR_r - x_ICR_l) * np.array([
             [-y_ICR_v * alpha_l, y_ICR_v * alpha_r],
             [x_ICR_r * alpha_l, -x_ICR_l * alpha_r],
             [-alpha_l, alpha_r]
         ])
 
-        return A
-
-    # Helper to compute B matrix
-    # TODO: How do you calculate the B matrix?
-    def compute_B_matrix(self):
-        B = np.zeros((3, 2))
-
         return B
+
+    # Helper to compute A matrix
+    # TODO: There is no A matrix in simple dynamics for skid steer
+    def compute_A_matrix(self):
+        A = np.zeros((3, 2))
+
+        return A
 
     # Linearized dynamics for Skid Steer Vehicle
     def continuous_time_linearized_dynamics(self):
         # Dynamics linearized at the fixed point
         # This function returns A and B matrix
 
-        A = np.zeros((3, 2))
-        # TODO: add parameters for A matrix
-        # A = self.compute_A_matrix()
+        # There is no A matrix in simple skid-steer system;
+        # Use I with NxN dim where N = len(xdot)
+        A = np.eye(3)
 
-        B = np.zeros((3, 2))
-        # TODO: may need to update based on B matrix calc verification result
-        B = self.compute_B_matrix()
+        B = np.zeros((3, 3))
+        # TODO: get const parameters for B matrix from self
+        # B = self.compute_B_matrix()
+        theta0 = self.x_d()[2]
+        # 1st row
+        B[0, 0] = -sin(theta0)
+        B[0, 1] = cos(theta0)
+        # 2nd row
+        B[1, 0] = cos(theta0)
+        B[1, 1] = sin(theta0)
+        # 3rd row
+        B[2, 2] = 1
 
         return A, B
 
@@ -113,7 +142,7 @@ class SkidSteerVehicle(object):
         # Discrete time version of the linearized dynamics at the fixed point
         # This function returns A and B matrix of the discrete time dynamics
         A_c, B_c = self.continuous_time_linearized_dynamics()
-        A_d = np.identity(6) + A_c * T
+        A_d = A_c  # There is no A matrix; just using identity from continuous dynamics here
         B_d = B_c * T
 
         return A_d, B_d
@@ -123,21 +152,11 @@ class SkidSteerVehicle(object):
         for i in range(len(x_current)):
             prog.AddBoundingBoxConstraint(x_current[i], x_current[i], x[0][i])
 
-        pass
-
     def add_input_saturation_constraint(self, prog, x, u, N):
-        # TODO: update input limits (based on max velocity left and right)
-        # Use AddBoundingBoxConstraint
-        # The limits are available through self.umin and self.umax
-
-        # TODO: understand why this limit works for quadrotor
-        l_b = self.umin - self.u_d()
-        u_b = self.umax - self.u_d()
+        # constrain left and right velocities
         for k in range(N - 1):
-            prog.AddBoundingBoxConstraint(l_b[0], u_b[0], u[k][0])
-            prog.AddBoundingBoxConstraint(l_b[1], u_b[1], u[k][1])
-
-        pass
+            for wheel in range(2):  # Two wheels: left (0) and right (1)
+                prog.AddBoundingBoxConstraint(self.umin, self.umax, u[k][wheel])
 
     def add_dynamics_constraint(self, prog, x, u, N, T):
         # TODO: update dynamics constraint.
@@ -151,33 +170,39 @@ class SkidSteerVehicle(object):
                 x_next = A @ x[k] + B @ u[k]
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
-        pass
-
     def add_cost(self, prog, x, u, N):
         # TODO: verify you can use the same cost for skid steer simple model
+        '''
         for k in range(N - 1):
             cost = x[k].T @ self.Q @ x[k] + u[k].T @ self.R @ u[k]
             prog.AddQuadraticCost(cost)
-
+        '''
+        for k in range(N - 1):
+            # State cost: (x - x_d).T @ Q @ (x - x_d)
+            # Control cost: u.T @ R @ u
+            state_cost = (x[k] - self.x_d()).T @ self.Q @ (x[k] - self.x_d())
+            control_cost = u[k].T @ self.R @ u[k]
+            total_cost = state_cost + control_cost
+            prog.AddQuadraticCost(total_cost)
         pass
 
     def compute_mpc_feedback(self, x_current, use_clf=False):
         '''
         This function computes the MPC controller input u
         '''
-
         # Parameters for the QP
         N = 10
         T = 0.1
 
         # Initialize mathematical program and decalre decision variables
         prog = MathematicalProgram()
-        x = np.zeros((N, 6), dtype="object")
+        x = np.zeros((N, 3), dtype="object")
         for i in range(N):
-            x[i] = prog.NewContinuousVariables(6, "x_" + str(i))
-        u = np.zeros((N - 1, 2), dtype="object")
+            x[i] = prog.NewContinuousVariables(3, "x_" + str(i))
+        u = np.zeros((N - 1, 3), dtype="object")
+        # print(f"u: {u[0]}")
         for i in range(N - 1):
-            u[i] = prog.NewContinuousVariables(2, "u_" + str(i))
+            u[i] = prog.NewContinuousVariables(3, "u_" + str(i))
 
         # Add constraints and cost
         self.add_initial_state_constraint(prog, x, x_current)
@@ -208,3 +233,9 @@ class SkidSteerVehicle(object):
         u = self.u_d() + K @ x
 
         return u
+
+    def compute_qp(self, x):
+        pass
+
+    def compute_non_linear_program(self, x):
+        pass

@@ -89,11 +89,11 @@ class Quadrotor(object):
         # This function returns A and B matrix
         A = np.zeros((6, 6))
         A[:3, -3:] = np.identity(3)
-        A[3, 2] = -self.g;
+        A[3, 2] = -self.g
 
         B = np.zeros((6, 2))
-        B[4, 0] = 1 / self.m;
-        B[4, 1] = 1 / self.m;
+        B[4, 0] = 1 / self.m
+        B[4, 1] = 1 / self.m
         B[5, 0] = self.a / self.I
         B[5, 1] = -self.a / self.I
 
@@ -103,22 +103,16 @@ class Quadrotor(object):
         # Discrete time version of the linearized dynamics at the fixed point
         # This function returns A and B matrix of the discrete time dynamics
         A_c, B_c = self.continuous_time_linearized_dynamics()
-        A_d = np.identity(6) + A_c * T;
-        B_d = B_c * T;
+        A_d = np.identity(6) + A_c * T
+        B_d = B_c * T
 
         return A_d, B_d
 
     def add_initial_state_constraint(self, prog, x, x_current):
         # TODO: impose initial state constraint.
         # Use AddBoundingBoxConstraint
-        # self.log("len(x_current)",len(x_current),3,1) # OUTPUT: 6
-        # self.log("len(x)",len(x),3,1)
-        # self.log("x.shape",x.shape,3,1)
-        # self.log("x_current.shape",x_current.shape,3,1)
         for i in range(len(x_current)):
             prog.AddBoundingBoxConstraint(x_current[i], x_current[i], x[0][i])
-
-        pass
 
     def add_input_saturation_constraint(self, prog, x, u, N):
         # TODO: impose input limit constraint.
@@ -130,26 +124,21 @@ class Quadrotor(object):
             prog.AddBoundingBoxConstraint(l_b[0], u_b[0], u[k][0])
             prog.AddBoundingBoxConstraint(l_b[1], u_b[1], u[k][1])
 
-        pass
-
     def add_dynamics_constraint(self, prog, x, u, N, T):
         # TODO: impose dynamics constraint.
         # Use AddLinearEqualityConstraint(expr, value)
         A, B = self.discrete_time_linearized_dynamics(T)
+
         for k in range(N - 1):
             for i in range(len(x[k])):
                 x_next = A @ x[k] + B @ u[k]
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
-
-        pass
 
     def add_cost(self, prog, x, u, N):
         # TODO: add cost.
         for k in range(N - 1):
             cost = x[k].T @ self.Q @ x[k] + u[k].T @ self.R @ u[k]
             prog.AddQuadraticCost(cost)
-
-        pass
 
     def compute_mpc_feedback(self, x_current, use_clf=False):
         '''
@@ -160,7 +149,7 @@ class Quadrotor(object):
         N = 10
         T = 0.1
 
-        # Initialize mathematical program and decalre decision variables
+        # Initialize mathematical program and declare decision variables
         prog = MathematicalProgram()
         x = np.zeros((N, 6), dtype="object")
         for i in range(N):
@@ -200,5 +189,5 @@ class Quadrotor(object):
         A, B = self.continuous_time_linearized_dynamics()
         S = solve_continuous_are(A, B, self.Q, self.R)
         K = -inv(self.R) @ B.T @ S
-        u = self.u_d() + K @ x;
+        u = self.u_d() + K @ x
         return u
