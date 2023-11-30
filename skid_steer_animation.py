@@ -47,29 +47,26 @@ def create_animation(x, tf, n_frames=60):
 
         ax.plot(x_des[0, 0], x_des[0, 1], 'b*', label='desired position')
         ax.plot(x_anim[:i + 1, 0], x_anim[:i + 1, 1], '--', label='actual trajectory')
-        # plot=ax.scatter(x_anim[i, 0], x_anim[i, 1], c='r', label='quadrotor position')
-        # plot=ax.scatter(x_anim[i, 0], x_anim[i, 1], c='r', label='quadrotor position')
-        # THE BELOW TWO LINES WERE THE OLD WAY TO CREATE THE LINE FOR THE ANIMATION
-        # plot = ax.plot([y[i] + a*cos(theta[i]), y[i] - a*cos(theta[i])],
-        #               [z[i] + a*sin(theta[i]), z[i] - a*sin(theta[i])] , 'g','LineWidtheeta',3)
 
         # THIS IS TO MAKE THE BOX
         # Calculate the center of the box
+
         center_y = y[i]
         center_z = z[i]
 
         # Define the width and height of the box
-        box_width = a * 0.25  # For example, the box can be twice the length of the bar
-        box_height = a * 0.25  # And half the length of the bar in height
+        box_width = a * 0.25
+        box_height = a * 0.5
 
         # Create a rectangle
         # The anchor point (bottom left corner of the rectangle) is calculated by subtracting half the width and height from the center coordinates
-        rect = Rectangle((center_y - box_width / 2, center_z - box_height / 2), box_width, box_height, color='green',
+        rect = Rectangle((center_y - box_width / 16, center_z - box_height / 16), box_width, box_height, color='green',
                          angle=degrees(theta[i]))
 
         ax.add_patch(rect)
         plot = [rect]  # plot needs to be a list of artists
         # END ADDED BOX CODE
+
         if (np.abs((x_max - x_min) - (y_max - y_min)) < 5):
             ax.set_xlim(x_min - x_padding, x_max + x_padding)
             ax.set_ylim(y_min - y_padding, y_max + y_padding)

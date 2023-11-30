@@ -67,26 +67,28 @@ def create_skid_steer():
     Load in the animation function
     """
     # Weights of LQR cost
-    R = np.eye(3) * 0.5
+    R = np.eye(2) * 0.5
     Q = np.diag([10, 10, 1])
     Qf = Q
 
     # End time of the simulation
 
     # Construct our skid steer controller
-    skid_steer = SkidSteerVehicle(Q, R, Qf)
-    return skid_steer
+    return SkidSteerVehicle(Q, R, Qf)
+
 def simulate_skid_steer_MPC(skid_steer, tf):
     # Set skid steer's initial state and simulate
-    x0 = np.array([2, 2, 3]) # THIS WORKS (anything between 3 - 20 seems to get to target)
+    x0 = np.array([2, 2, 3])  # THIS WORKS (anything between 3 - 20 seems to get to target)
+
     # Run MPC
-    #x, u, t = simulate_skid_steer(x0, tf, skid_steer)
+    x, u, t = simulate_skid_steer(x0, tf, skid_steer)
 
     # Run LQR
-    x, u, t = simulate_skid_steer(x0, tf, skid_steer, False)
+    #x, u, t = simulate_skid_steer(x0, tf, skid_steer, False)
 
     anim, fig = skid_steer_animation.create_animation(x, tf)
     plt.show()
+
     return anim, fig
 
 

@@ -60,11 +60,12 @@ class SkidSteerVehicle(object):
 
     def u_d(self):
         # Nominal input
-        return np.array([0, 0, 0])
+        return np.array([0, 0])
 
     # Continuous-time dynamics for the skid-steer vehicle
     def continuous_time_full_dynamics(self, x, u):
         # TODO: verify continuous time dynamics calculation for skid steer
+        #print(f"u shape: {u.shape}")
         # Get state variables
         v_x, v_y, w_z = x[0], x[1], x[2]
         V_l, V_r = u[0], u[1]
@@ -89,22 +90,24 @@ class SkidSteerVehicle(object):
         fxu = np.array([xdot, ydot, wdot])
         return fxu
 
-    # Helper to compute B matrix
     # CALLED A in PAPER
-    def compute_B_matrix(self, V_l, V_r, alpha_l, alpha_r, v_x, v_y, w_z):
-        # Compute A matrix based on provided dynamics
+    def get_kinematics(self, x, u):
+        v_x, v_y, w_z = x[0], x[1], x[2]
+        V_l, V_r = u[0], u[1]
+
+        # Compute A matrix based on provided dynamics (paper)
         x_ICR_v = -v_y / w_z
-        x_ICR_l = (alpha_l * V_l - v_y) / w_z
-        x_ICR_r = (alpha_r * V_r - v_y) / w_z
+        x_ICR_l = (self.alpha_l * V_l - v_y) / w_z
+        x_ICR_r = (self.alpha_r * V_r - v_y) / w_z
         y_ICR_v = y_ICR_l = y_ICR_r = v_x / w_z
 
-        B = 1 / (x_ICR_r - x_ICR_l) * np.array([
-            [-y_ICR_v * alpha_l, y_ICR_v * alpha_r],
-            [x_ICR_r * alpha_l, -x_ICR_l * alpha_r],
-            [-alpha_l, alpha_r]
+        A = 1 / (x_ICR_r - x_ICR_l) * np.array([
+            [-y_ICR_v * self.alpha_l, y_ICR_v * self.alpha_r],
+            [x_ICR_r * self.alpha_l, -x_ICR_l * self.alpha_r],
+            [-self.alpha_l, self.alpha_r]
         ])
 
-        return B
+        return A
 
     # Helper to compute A matrix
     # TODO: There is no A matrix in simple dynamics for skid steer
@@ -159,15 +162,30 @@ class SkidSteerVehicle(object):
                 prog.AddBoundingBoxConstraint(self.umin, self.umax, u[k][wheel])
 
     def add_dynamics_constraint(self, prog, x, u, N, T):
+        A = self.get_kinematics(x, u)  # <--this won't work
+        for k in range(N - 1):
+            for i in range(len(x[k])):
+                x_next = A @ u[k]
+                prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
+
+    def add_dynamics_constraint_TEST(self, prog, x, u, N, T):
         # TODO: update dynamics constraint.
         # Use AddLinearEqualityConstraint(expr, value)
 
-        A, B = self.discrete_time_linearized_dynamics(T)
-
-        # TODO: understand why this limit works for quadrotor
         for k in range(N - 1):
-            for i in range(len(x[k])):
-                x_next = A @ x[k] + B @ u[k]
+            x_current = x[k]
+            u_current = u[k]
+            x_next = x[k + 1]
+
+            # Compute the continuous-time dynamics for the given x and u
+            fxu = self.continuous_time_full_dynamics(x_current, u_current)
+
+            # Discretize the continuous-time dynamics using Taylor series expansion
+            A, B = self.discrete_time_linearized_dynamics(T)
+
+            # Apply the dynamics constraint
+            for i in range(len(x_current)):
+                x_dot = A @ x_current + B @ fxu
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
     def add_cost(self, prog, x, u, N):
@@ -197,17 +215,19 @@ class SkidSteerVehicle(object):
         # Initialize mathematical program and decalre decision variables
         prog = MathematicalProgram()
         x = np.zeros((N, 3), dtype="object")
+
         for i in range(N):
             x[i] = prog.NewContinuousVariables(3, "x_" + str(i))
-        u = np.zeros((N - 1, 3), dtype="object")
-        # print(f"u: {u[0]}")
+        u = np.zeros((N - 1, 2), dtype="object")
+        #print(f"u: {u[0]}")
+
         for i in range(N - 1):
-            u[i] = prog.NewContinuousVariables(3, "u_" + str(i))
+            u[i] = prog.NewContinuousVariables(2, "u_" + str(i))
 
         # Add constraints and cost
         self.add_initial_state_constraint(prog, x, x_current)
         self.add_input_saturation_constraint(prog, x, u, N)
-        self.add_dynamics_constraint(prog, x, u, N, T)
+        #self.add_dynamics_constraint(prog, x, u, N, T)
         self.add_cost(prog, x, u, N)
 
         # Solve the QP
@@ -215,12 +235,11 @@ class SkidSteerVehicle(object):
         result = solver.Solve(prog)
 
         u_mpc = np.zeros(2)
-        # TODO: retrieve the controller input from the solution of the optimization problem
+        # Retrieve the controller input from the solution of the optimization problem
         # and use it to compute the MPC input u
-        # You should make use of result.GetSolution(decision_var) where decision_var
-        # is the variable you want
         u_0 = result.GetSolution(u[0])
         u_mpc = u_0 + self.u_d()
+
         return u_mpc
 
     def compute_lqr_feedback(self, x):

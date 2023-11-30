@@ -15,7 +15,8 @@ def simulate_skid_steer(x0, tf, skid_steer, use_mpc=True, use_mpc_with_clf=False
     dt = 1e-2
 
     x = [x0]
-    u = [np.zeros((3,))]
+    #u = [np.zeros((3,))]
+    u = [np.zeros((2,))]
     t = [t0]
     print(f"Dimensions of x {x}")
 
@@ -50,7 +51,7 @@ def simulate_skid_steer(x0, tf, skid_steer, use_mpc=True, use_mpc_with_clf=False
     t = np.array(t)
     return x, u, t
 
-
+'''
 def plot_x_and_u(x, u, t, name):
     plt.figure()
     ax = plt.axes()
@@ -70,23 +71,26 @@ def plot_x_and_u(x, u, t, name):
     plt.ylabel("u (N)")
     plt.legend(["u1", "u2"])
     plt.title(name + " commanded inputs")
-
-
+'''
+'''
 if __name__ == '__main__':
+    # Quadrotor
     #R = np.eye(2)
-    R = np.eye(3)
-    # TODO: What are the dimensions of Q?
     #Q = np.diag([10, 10, 1, 1, 1, 1])
-    Q = np.diag([1,1,1])
+
+    # x0 params [y, z, 0, ydot, zdot, thetadot]
+    # x0 = np.array([0.5, 0.5, 0, 1, 1, 0])
+
+    # Skid steer
+    R = np.eye(3)
+    Q = np.diag([1, 1, 1])
     Qf = Q
 
-    skid_steer = SkidSteerVehicle(Q, R, Qf);
+    skid_steer = SkidSteerVehicle(Q, R, Qf)
 
     # Initial state
     d_rand = 1
-    # x0 params [y, z, 0, ydot, zdot, thetadot]
-    # x0 = np.array([0.5, 0.5, 0, 1, 1, 0])
-    x0 = np.array([0.5, 0.5, 0.5])
+    x0 = np.array([2, 2, 3])
 
     tf = 10
 
@@ -98,8 +102,9 @@ if __name__ == '__main__':
 
     # Initial state to remain in the 1-sublevel of V
     plot_x_and_u(x, u, t, "MPC using CLF")
-    x0 = np.array([0.5, 0.5, 0.5])
+    x0 = np.array([2, 2, 3])
     x, u, t = simulate_skid_steer(x0, tf, skid_steer, False, False, True)
     plot_x_and_u(x, u, t, "CLF QP-version")
 
     plt.show()
+'''
