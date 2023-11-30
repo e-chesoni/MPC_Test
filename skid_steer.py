@@ -91,19 +91,18 @@ class SkidSteerVehicle(object):
         return fxu
 
     # CALLED A in PAPER
-    def get_kinematics(self, x, u):
-        v_x, v_y, w_z = x[0], x[1], x[2]
-        V_l, V_r = u[0], u[1]
-
+    def get_kinematics(self):
         # Compute A matrix based on provided dynamics (paper)
+        '''
         x_ICR_v = -v_y / w_z
         x_ICR_l = (self.alpha_l * V_l - v_y) / w_z
         x_ICR_r = (self.alpha_r * V_r - v_y) / w_z
         y_ICR_v = y_ICR_l = y_ICR_r = v_x / w_z
+        '''
 
-        A = 1 / (x_ICR_r - x_ICR_l) * np.array([
-            [-y_ICR_v * self.alpha_l, y_ICR_v * self.alpha_r],
-            [x_ICR_r * self.alpha_l, -x_ICR_l * self.alpha_r],
+        A = 1 / (self.x_ICR_r - self.x_ICR_l) * np.array([
+            [-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
+            [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
             [-self.alpha_l, self.alpha_r]
         ])
 
@@ -170,11 +169,15 @@ class SkidSteerVehicle(object):
         '''
 
     def add_dynamics_constraint(self, prog, x, u, N, T):
-        A = self.get_kinematics(x, u)  # <--this won't work
+        A = self.get_kinematics()  # <--this won't work
         for k in range(N - 1):
             for i in range(len(x[k])):
                 x_next = A @ u[k]
+                #x[k + 1] = x[k] + self.dt * (R_linearized[k] @ A @ u[k])
+                # TODO: Make this cost work (see ed)
+                #x_next = x[k] + T * (R_linearized[k] @ A @ u[k])
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
+
 
     def add_dynamics_constraint_TEST(self, prog, x, u, N, T):
         # TODO: update dynamics constraint.
@@ -240,7 +243,7 @@ class SkidSteerVehicle(object):
         # Add constraints and cost
         self.add_initial_state_constraint(prog, x, x_current)
         self.add_input_saturation_constraint(prog, x, u, N)
-        #self.add_dynamics_constraint(prog, x, u, N, T)
+        self.add_dynamics_constraint(prog, x, u, N, T)
         self.add_cost(prog, x, u, N)
 
         # Solve the QP
