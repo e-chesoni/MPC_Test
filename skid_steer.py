@@ -79,7 +79,7 @@ class SkidSteerVehicle(object):
         # Calculate continuous-time dynamics for global system
         xdot = v_x * cos(x[2]) - v_y * sin(x[2])
         ydot = v_x * sin(x[2]) + v_y * cos(x[2])
-        wdot = (V_r - V_l) / (x_ICR_r - x_ICR_l) * (-self.alpha_l + self.alpha_r)
+        wdot = (V_r - V_l) / (x_ICR_r - x_ICR_l) * (-self.alpha_l + self.alpha_r) # angular rate between wheels
 
         # TODO: Verify this is not needed; state vector = position vector = 3x1
         # Update the state derivatives
@@ -160,6 +160,14 @@ class SkidSteerVehicle(object):
         for k in range(N - 1):
             for wheel in range(2):  # Two wheels: left (0) and right (1)
                 prog.AddBoundingBoxConstraint(self.umin, self.umax, u[k][wheel])
+        # TODO: how do we constrain vehicle orientation?
+
+        # constrains difference in wheel velocities to be 0
+        # TODO: Make this a cost
+        '''
+        for k in range(N - 1):
+            prog.AddLinearEqualityConstraint(u[k][0] - u[k][1], 0.0)
+        '''
 
     def add_dynamics_constraint(self, prog, x, u, N, T):
         A = self.get_kinematics(x, u)  # <--this won't work
@@ -202,8 +210,13 @@ class SkidSteerVehicle(object):
             control_cost = u[k].T @ self.R @ u[k]
             total_cost = state_cost + control_cost
             prog.AddQuadraticCost(total_cost)
-        pass
 
+        # TODO: How to we tax bad orientation
+        '''
+        for k in range(N - 1):
+            cost = self.Q * (u[k][0] - u[k][1]) ** 2
+            prog.AddQuadraticCost(cost)
+        '''
     def compute_mpc_feedback(self, x_current, use_clf=False):
         '''
         This function computes the MPC controller input u

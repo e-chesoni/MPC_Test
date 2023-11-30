@@ -68,7 +68,7 @@ def create_skid_steer():
     """
     # Weights of LQR cost
     R = np.eye(2) * 0.5
-    Q = np.diag([10, 10, 1])
+    Q = np.diag([10, 10, 1])  # tax theta the least so car can turn
     Qf = Q
 
     # End time of the simulation
