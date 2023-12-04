@@ -63,7 +63,7 @@ class Quadrotor(object):
         return np.array([self.m * self.g / 2, self.m * self.g / 2])
 
     def continuous_time_full_dynamics(self, x, u):
-        # Dynamics for the quadrotor
+        # Dynamics for the quad
         g = self.g
         m = self.m
         a = self.a

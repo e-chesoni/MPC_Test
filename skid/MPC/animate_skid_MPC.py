@@ -6,17 +6,13 @@ import matplotlib.animation as animation
 from matplotlib.patches import Rectangle
 
 
-def x_d(t):
-    return np.zeros(3)
-
-
-def create_animation(x, tf, n_frames=60):
+def skid_steer_MPC_animation(x, x_d, tf, n_frames=60):
     # Sample desired trajectory
     n_samples = 1000
     t_samples = np.linspace(0.0, tf, n_samples)
     x_des = np.zeros((n_samples, 3))
     for i in range(t_samples.shape[0]):
-        x_des[i] = x_d(t_samples[i])
+        x_des[i] = x_d
 
     from matplotlib import rc
     rc('animation', html='jshtml')
@@ -58,12 +54,23 @@ def create_animation(x, tf, n_frames=60):
         box_width = a * 0.25
         box_height = a * 0.5
 
+        # Calculate the orientation angle (in degrees)
+        angle_deg = degrees(theta[i])
+
         # Create a rectangle
         # The anchor point (bottom left corner of the rectangle) is calculated by subtracting half the width and height from the center coordinates
         rect = Rectangle((center_y - box_width / 16, center_z - box_height / 16), box_width, box_height, color='green',
-                         angle=degrees(theta[i]))
+                         angle=angle_deg)
+
+        # Calculate the coordinates for the front part of the box
+        front_height = box_height / 4
+
+        # Create a rectangle for the front part with a different color (e.g., red)
+        front_rect = Rectangle((center_y - box_width / 16, center_z - front_height / 16), box_width, front_height,
+                        color='red', angle=angle_deg)
 
         ax.add_patch(rect)
+        ax.add_patch(front_rect)
         plot = [rect]  # plot needs to be a list of artists
         # END ADDED BOX CODE
 

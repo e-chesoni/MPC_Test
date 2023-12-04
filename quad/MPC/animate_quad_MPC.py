@@ -9,7 +9,7 @@ def x_d(t):
     return np.zeros(6)
 
 
-def create_animation(x, tf, n_frames=60):
+def quad_MPC_animation(x, tf, n_frames=60):
     # Sample desired trajectory
     n_samples = 1000
     t_samples = np.linspace(0.0, tf, n_samples)
@@ -46,7 +46,7 @@ def create_animation(x, tf, n_frames=60):
 
         ax.plot(x_des[0, 0], x_des[0, 1], 'b*', label='desired position')
         ax.plot(x_anim[:i + 1, 0], x_anim[:i + 1, 1], '--', label='actual trajectory')
-        # plot=ax.scatter(x_anim[i, 0], x_anim[i, 1], c='r', label='quadrotor position')
+        # plot=ax.scatter(x_anim[i, 0], x_anim[i, 1], c='r', label='quad position')
         plot = ax.plot([y[i] + a * cos(theta[i]), y[i] - a * cos(theta[i])],
                        [z[i] + a * sin(theta[i]), z[i] - a * sin(theta[i])], 'g', 'LineWidtheeta', 3)
 

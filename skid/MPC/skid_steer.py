@@ -20,7 +20,6 @@ class SkidSteerVehicle(object):
     def __init__(self, Q, R, Qf):
         print("Init SkidSteerVehicle...")
         # TODO: Kinematic model parameters to tweak
-        '''
         self.alpha_l = 0.9464
         self.alpha_r = 0.9253
         self.x_ICR_l = -0.2758
@@ -32,7 +31,7 @@ class SkidSteerVehicle(object):
         self.x_ICR_l = -2
         self.x_ICR_r = 2
         self.y_ICR_v = -0.08
-
+        '''
         self.Q = Q
         self.R = R
         self.Qf = Qf
@@ -54,9 +53,12 @@ class SkidSteerVehicle(object):
         self.n_x = 3  # number of states
         self.n_u = 2  # number of control inputs
 
-    def x_d(self):
-        # Nominal state
-        return np.array([0, 0, 0])
+        self.x_d = np.zeros(3)  # default destination is [0,0,0]
+
+    def set_destination(self, d):
+        print(f"Setting destination to: {d}")
+        self.x_d = d
+        pass
 
     def u_d(self):
         # Nominal input
@@ -65,55 +67,64 @@ class SkidSteerVehicle(object):
     # Continuous-time dynamics for the skid-steer vehicle
     def continuous_time_full_dynamics(self, x, u):
         # TODO: verify continuous time dynamics calculation for skid steer
-        #print(f"u shape: {u.shape}")
         # Get state variables
         v_x, v_y, w_z = x[0], x[1], x[2]
         V_l, V_r = u[0], u[1]
 
-        # Parameters from the kinematic model
-        x_ICR_v = -v_y / w_z
-        x_ICR_l = (self.alpha_l * V_l - v_y) / w_z
-        x_ICR_r = (self.alpha_r * V_r - v_y) / w_z
-        y_ICR_v = y_ICR_l = y_ICR_r = v_x / w_z
-
         # Calculate continuous-time dynamics for global system
         xdot = v_x * cos(x[2]) - v_y * sin(x[2])
         ydot = v_x * sin(x[2]) + v_y * cos(x[2])
-        wdot = (V_r - V_l) / (x_ICR_r - x_ICR_l) * (-self.alpha_l + self.alpha_r) # angular rate between wheels
-
-        # TODO: Verify this is not needed; state vector = position vector = 3x1
-        # Update the state derivatives
-        #v_xdot = -v_y / (x_ICR_r - x_ICR_l) * (-y_ICR_v * self.alpha_l * V_l + y_ICR_v * self.alpha_r * V_r)
-        #v_ydot = -v_y / (x_ICR_r - x_ICR_l) * (x_ICR_r * self.alpha_l * V_l - x_ICR_l * self.alpha_r * V_r)
-        #w_zdot = -v_y / (x_ICR_r - x_ICR_l) * (-self.alpha_l * V_l + self.alpha_r * V_r)
+        wdot = (V_r - V_l) / (self.x_ICR_r - self.x_ICR_l) * (-self.alpha_l + self.alpha_r) # angular rate between wheels
 
         fxu = np.array([xdot, ydot, wdot])
         return fxu
 
-    # CALLED A in PAPER
+    def rotate(self, x):
+        theta = x[2]
+        R = np.array([[-sin(theta), -cos(theta), 0],
+                      [cos(theta), sin(theta), 0],
+                      [0, 0, 1]])
+
+        return R
+
     def get_kinematics(self):
         # Compute A matrix based on provided dynamics (paper)
         '''
-        x_ICR_v = -v_y / w_z
-        x_ICR_l = (self.alpha_l * V_l - v_y) / w_z
-        x_ICR_r = (self.alpha_r * V_r - v_y) / w_z
-        y_ICR_v = y_ICR_l = y_ICR_r = v_x / w_z
-        '''
-
         A = 1 / (self.x_ICR_r - self.x_ICR_l) * np.array([
             [-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
             [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
             [-self.alpha_l, self.alpha_r]
         ])
+        '''
+
+        A = np.array([[-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
+                      [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
+                      [-self.alpha_l, self.alpha_r]])
 
         return A
 
-    # Helper to compute A matrix
-    # TODO: There is no A matrix in simple dynamics for skid steer
-    def compute_A_matrix(self):
-        A = np.zeros((3, 2))
+    # TODO: Add conversion to global calc
+    def input_to_local_coord(self, u: np.ndarray) -> np.ndarray:
+        # u is a 2x1 array
+        # multiply by u by A matrix (from paper) to get local coord
+        # print(f"u.shape: {u.shape}")
 
-        return A
+        local_u = self.get_kinematics() @ u
+
+        return local_u
+
+    def local_to_global(self, local_u: np.ndarray) -> np.ndarray:
+        # local coord is a  3x1
+        # multiply local coord by rotation matrix (R) to get global coord
+
+        omega = local_u[1]
+
+        global_u = np.zeros(3)
+        global_u[0] = cos(omega) * local_u[0] - sin(omega) * local_u[1]
+        global_u[1] = sin(omega) * local_u[0] - cos(omega) * local_u[1]
+        global_u[2] = omega
+
+        return global_u
 
     # Linearized dynamics for Skid Steer Vehicle
     def continuous_time_linearized_dynamics(self):
@@ -124,18 +135,10 @@ class SkidSteerVehicle(object):
         # Use I with NxN dim where N = len(xdot)
         A = np.eye(3)
 
-        B = np.zeros((3, 3))
-        # TODO: get const parameters for B matrix from self
-        # B = self.compute_B_matrix()
-        theta0 = self.x_d()[2]
-        # 1st row
-        B[0, 0] = -sin(theta0)
-        B[0, 1] = cos(theta0)
-        # 2nd row
-        B[1, 0] = cos(theta0)
-        B[1, 1] = sin(theta0)
-        # 3rd row
-        B[2, 2] = 1
+        A_kinematics = self.get_kinematics()
+        R = self.rotate(self.x_d)
+
+        B = R @ A_kinematics
 
         return A, B
 
@@ -150,14 +153,14 @@ class SkidSteerVehicle(object):
         return A_d, B_d
 
     def add_initial_state_constraint(self, prog, x, x_current):
-        # TODO: verify you can use the same constraint as quadrotor for initial state
+        # TODO: verify you can use the same constraint as quad for initial state
         for i in range(len(x_current)):
             prog.AddBoundingBoxConstraint(x_current[i], x_current[i], x[0][i])
 
     def add_input_saturation_constraint(self, prog, x, u, N):
         # constrain left and right velocities
         for k in range(N - 1):
-            for wheel in range(2):  # Two wheels: left (0) and right (1)
+            for wheel in range(2):
                 prog.AddBoundingBoxConstraint(self.umin, self.umax, u[k][wheel])
         # TODO: how do we constrain vehicle orientation?
 
@@ -169,34 +172,16 @@ class SkidSteerVehicle(object):
         '''
 
     def add_dynamics_constraint(self, prog, x, u, N, T):
-        A = self.get_kinematics()  # <--this won't work
+        A = self.get_kinematics()
         for k in range(N - 1):
             for i in range(len(x[k])):
-                x_next = A @ u[k]
-                #x[k + 1] = x[k] + self.dt * (R_linearized[k] @ A @ u[k])
-                # TODO: Make this cost work (see ed)
-                #x_next = x[k] + T * (R_linearized[k] @ A @ u[k])
-                prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
+                # From ed: x[k + 1] = x[k] + self.dt * (R_linearized[k] @ A @ u[k])
+                # In our code it's more convenient to group like this:
+                # x[k + 1] = x[k] + (self.dt * R_linearized[k]) @ A @ u[k]
+                # discrete_time_linearized_dynamics(T) returns self.dt * R_linearized[k]
+                A_d, B_d = self.discrete_time_linearized_dynamics(T)
 
-
-    def add_dynamics_constraint_TEST(self, prog, x, u, N, T):
-        # TODO: update dynamics constraint.
-        # Use AddLinearEqualityConstraint(expr, value)
-
-        for k in range(N - 1):
-            x_current = x[k]
-            u_current = u[k]
-            x_next = x[k + 1]
-
-            # Compute the continuous-time dynamics for the given x and u
-            fxu = self.continuous_time_full_dynamics(x_current, u_current)
-
-            # Discretize the continuous-time dynamics using Taylor series expansion
-            A, B = self.discrete_time_linearized_dynamics(T)
-
-            # Apply the dynamics constraint
-            for i in range(len(x_current)):
-                x_dot = A @ x_current + B @ fxu
+                x_next = x[k] + (B_d @ u[k])
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
     def add_cost(self, prog, x, u, N):
@@ -209,7 +194,7 @@ class SkidSteerVehicle(object):
         for k in range(N - 1):
             # State cost: (x - x_d).T @ Q @ (x - x_d)
             # Control cost: u.T @ R @ u
-            state_cost = (x[k] - self.x_d()).T @ self.Q @ (x[k] - self.x_d())
+            state_cost = (x[k] - self.x_d).T @ self.Q @ (x[k] - self.x_d)
             control_cost = u[k].T @ self.R @ u[k]
             total_cost = state_cost + control_cost
             prog.AddQuadraticCost(total_cost)
