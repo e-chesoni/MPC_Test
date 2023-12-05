@@ -11,14 +11,20 @@ def run_skid_iLQR():
     print("Running Skid Steer iLQR...")
 
     # Set up the iLQR problem
-    N = 200  # TODO: What are the units of N?
-    dt = 0.02
-    x_goal = np.array([-0.5, 1.8, 0])
+    N = 3000
+    dt = 0.01
+    x_goal = np.array([0.1, 1.0, 0])
+    x_goal = np.array([0.2, 0.8, 0])  # really, really slow but works
 
     # TODO: Adjust the costs as needed for convergence
-    Q = np.eye(3)
+    Q = .01 * np.eye(3)
+    Q[2, 2] = 0
+
+    # Q[-1,-1] = 0.1
     Qf = 1e2 * np.eye(3)
-    R = 1e-3 * np.eye(2)
+    Qf[2, 2] = 0
+    # Qf = Q
+    R = np.eye(2) * 0.001
 
     ilqr = skid_iLQR(x_goal, N, dt, Q, R, Qf)
 
@@ -26,7 +32,7 @@ def run_skid_iLQR():
     x0 = np.zeros((3,))
 
     # initial guess for the input is just hovering in place
-    u_guess = [0.5 * 9.81 * ilqr.m * np.ones((2,))] * (N - 1)
+    u_guess = [np.ones((2,))] * (N - 1)
 
     x_sol, u_sol, K_sol = ilqr.calculate_optimal_trajectory(x0, u_guess)
 

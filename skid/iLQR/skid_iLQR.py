@@ -22,11 +22,11 @@ class skid_iLQR(object):
         self.m = 1
 
         # Skid steer dynamics parameters
-        self.alpha_l = 1
-        self.alpha_r = 9
-        self.x_ICR_l = -2
-        self.x_ICR_r = 2
-        self.y_ICR_v = -0.08
+        self.alpha_l = 0.9464
+        self.alpha_r = 0.9253
+        self.x_ICR_l = -0.2758
+        self.x_ICR_r = 0.2998
+        self.y_ICR_v = -0.0080
 
         # State and input dimensions
         self.nx = 3
@@ -43,59 +43,16 @@ class skid_iLQR(object):
 
         # target state
         self.x_goal = x_goal
-        self.u_goal = 0.5 * 9.81 * np.ones((2,))
+        self.u_goal = np.zeros((2,))
 
         # Cost terms
         self.Q = Q
         self.R = R
         self.Qf = Qf
 
-    def rotate(self, x):
-        theta = x[2]
-        R = np.array([[-sin(theta), -cos(theta), 0],
-                      [cos(theta), sin(theta), 0],
-                      [0, 0, 1]])
-
-        return R
-
-    def get_kinematics(self):
-        # Compute A matrix based on provided dynamics (paper)
-        '''
-        A = 1 / (self.x_ICR_r - self.x_ICR_l) * np.array([
-            [-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
-            [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
-            [-self.alpha_l, self.alpha_r]
-        ])
-        '''
-
-        A = np.array([[-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
-                      [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
-                      [-self.alpha_l, self.alpha_r]])
-
-        return A
-
-    # TODO: Add conversion to global calc
-    def input_to_local_coord(self, u: np.ndarray) -> np.ndarray:
-        # u is a 2x1 array
-        # multiply by u by A matrix (from paper) to get local coord
-        # print(f"u.shape: {u.shape}")
-
-        local_u = self.get_kinematics() @ u
-
-        return local_u
-
-    def local_to_global(self, local_u: np.ndarray) -> np.ndarray:
-        # local coord is a  3x1
-        # multiply local coord by rotation matrix (R) to get global coord
-
-        omega = local_u[1]
-
-        global_u = np.zeros(3)
-        global_u[0] = cos(omega) * local_u[0] - sin(omega) * local_u[1]
-        global_u[1] = sin(omega) * local_u[0] - cos(omega) * local_u[1]
-        global_u[2] = omega
-
-        return global_u
+    def total_cost(self, xx, uu):
+        J = sum([self.running_cost(xx[k], uu[k]) for k in range(self.N - 1)])
+        return J + self.terminal_cost(xx[-1])
 
     def get_linearized_dynamics(self, x: np.ndarray, u: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -109,14 +66,15 @@ class skid_iLQR(object):
 
         A_kinematics = self.get_kinematics()
         R = self.rotate(x)
+        # print("getlindynamicsA", A_kinematics)
 
         B = R @ A_kinematics
-        print(f"B: {B}")
-        '''
-        print(f"A.shape from get_linearized_dynamics: {A_kinematics.shape}")
-        print(f"R.shape from get_linearized_dynamics: {R.shape}")
-        print(f"B.shape from get_linearized_dynamics: {B.shape}")
-        '''
+        # print("getlindynamicsB", B)
+
+        # print(f"A.shape from get_linearized_dynamics: {A_kinematics.shape}")
+        # print(f"R.shape from get_linearized_dynamics: {R.shape}")
+        # print(f"B.shape from get_linearized_dynamics: {B.shape}")
+
         return A, B
 
     def get_linearized_discrete_dynamics(self, x: np.ndarray, u: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -134,13 +92,8 @@ class skid_iLQR(object):
         # R_linearized is what is returned by get_linearized_dynamics I think?
         Ad = A
         Bd = self.dt * B
-        # TODO: can we convert B to a 2x2 or something here?
 
         return Ad, Bd
-
-    def total_cost(self, xx, uu):
-        J = sum([self.running_cost(xx[k], uu[k]) for k in range(self.N - 1)])
-        return J + self.terminal_cost(xx[-1])
 
     def running_cost(self, xk: np.ndarray, uk: np.ndarray) -> float:
         """
@@ -188,21 +141,21 @@ class skid_iLQR(object):
          [∂²l/∂u∂x, ∂²l/∂u²]], evaluated at xk, uk
         """
         H = np.zeros((self.nx + self.nu, self.nx + self.nu))
+        # H = np.zeros((3, 3))
         # TODO: Compute the hessian
-        '''
-        print(f"H.shape: {H.shape}")
-        print(f"xk.shape: {xk}")
-        print(f"uk.shape: {uk.shape}")
-        print(f"self.x_goal.shape: {self.x_goal.shape}")
-        print(f"self.u_goal.shape: {self.u_goal.shape}")
-        '''
+        # print(f"H.shape: {H.shape}")
+        # print(f"xk.shape: {xk}")
+        # print(f"uk.shape: {uk.shape}")
+        # print(f"self.x_goal.shape: {self.x_goal.shape}")
+        # print(f"self.u_goal.shape: {self.u_goal.shape}")
+
         # Translate u_goal into global coord
-        u_goal_local = self.input_to_local_coord(self.u_goal)
-        u_goal_global = self.local_to_global(u_goal_local)
+        # u_goal_local = self.input_to_local_coord(self.u_goal)
+        # u_goal_global = self.local_to_global(u_goal_local)
 
         # get the running cost
-        running_cost = 0.5 * ((xk - self.x_goal).T @ self.Q @ (xk - self.x_goal) +
-                              (uk - self.u_goal).T @ self.R @ (uk - self.u_goal))
+        # running_cost = 0.5 * ((xk - self.x_goal).T @ self.Q @ (xk - self.x_goal) +
+        #                       (uk - self.u_goal).T @ self.R @ (uk - self.u_goal))
 
         # find ∂²l/∂x² (use running cost func and calc by hand)
         H[:self.nx, :self.nx] = self.Q  # the second derivative in the x direction is just Q
@@ -210,9 +163,11 @@ class skid_iLQR(object):
         # find ∂²l/∂u² (use running cost func and calc by hand)
         H[self.nx:, self.nx:] = self.R
 
+        # populate H with the second order derivatives
+
         return H
 
-    def terminal_cost(self, xf: np.ndarray) -> ndarray[Any, dtype[floating[Any]]]:
+    def terminal_cost(self, xf: np.ndarray) -> float:
         """
         :param xf: state
         :return: Lf(xf), the running cost incurred by xf
@@ -224,6 +179,8 @@ class skid_iLQR(object):
         :param xf: final state
         :return: ∂Lf/∂xf
         """
+        grad = np.zeros((self.nx))
+
         # TODO: Compute the gradient
         # differentiate ∂Lf/∂xf with respect to x
         grad = (xf - self.x_goal).T @ self.Qf
@@ -235,13 +192,64 @@ class skid_iLQR(object):
         :param xf: final state
         :return: ∂²Lf/∂xf²
         """
+        H = np.zeros((self.nx, self.nx))
+
         # TODO: Compute H
         # differentiate ∂²Lf/∂xf² with respect to x
         H = self.Qf
 
         return H
 
-    # TODO: Fix forward pass; we think this is returning 0 and 0 for x and y every step
+    def rotate(self, x):
+        R = np.zeros((3, 3))
+
+        theta = x[2]
+
+        R = np.array([[cos(theta), -sin(theta), 0],  # makes it go left
+                      [sin(theta), cos(theta), 0],
+                      [0, 0, 1]])
+
+        return R
+
+    def get_kinematics(self):
+        # Compute A matrix based on provided dynamics (paper)
+        '''
+        A = 1 / (self.x_ICR_r - self.x_ICR_l) * np.array([
+            [-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
+            [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
+            [-self.alpha_l, self.alpha_r]
+        ])
+        '''
+
+        A = np.array([[-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
+                      [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
+                      [-self.alpha_l, self.alpha_r]])
+
+        return A
+
+    # # TODO: Add conversion to global calc
+    # def input_to_local_coord(self, u: np.ndarray) -> np.ndarray:
+    #     # u is a 2x1 array
+    #     # multiply by u by A matrix (from paper) to get local coord
+    #     # print(f"u.shape: {u.shape}")
+
+    #     local_u = self.get_kinematics() @ u
+
+    #     return local_u
+
+    # def local_to_global(self, local_u: np.ndarray) -> np.ndarray:
+    #     # local coord is a  3x1
+    #     # multiply local coord by rotation matrix (R) to get global coord
+
+    #     omega = local_u[1]
+
+    #     global_u = np.zeros(3)
+    #     global_u[0] = cos(omega) * local_u[0] - sin(omega) * local_u[1]
+    #     global_u[1] = sin(omega) * local_u[0] + cos(omega) * local_u[1]
+    #     global_u[2] = omega
+
+    #     return global_u
+
     def forward_pass(self, xx: List[np.ndarray], uu: List[np.ndarray], dd: List[np.ndarray], KK: List[np.ndarray]) -> \
             Tuple[List[np.ndarray], List[np.ndarray]]:
         """
@@ -253,7 +261,7 @@ class skid_iLQR(object):
                  trajectories after applying the iLQR forward pass
         """
 
-        xtraj = [np.zeros((self.nx,))] * self.N
+        xtraj = [np.zeros((self.nx,))] * self.N  # was np.zeros
         utraj = [np.zeros((self.nu,))] * (self.N - 1)
         xtraj[0] = xx[0]
 
@@ -262,8 +270,7 @@ class skid_iLQR(object):
             utraj[k] = uu[k] + (KK[k] @ (xtraj[k] - xx[k])) + self.alpha * dd[k]
             # use quad_sim to simulate
             xtraj[k + 1] = sim_skid_iLQR.F(xtraj[k], utraj[k], self.dt)
-
-        #print(f"xtraj: {xtraj}, utraj: {utraj}")
+            # print("xtraj", xtraj)
 
         return xtraj, utraj
 
@@ -282,11 +289,12 @@ class skid_iLQR(object):
 
         for k in range(self.N - 2, -1, -1):
             # TODO: convert uu to 3x1 global coord
-            local_uk = self.input_to_local_coord(uu[k])
-            global_uk = self.local_to_global(local_uk)
+            # local_uk = self.input_to_local_coord(uu[k])
+            # global_uk = self.local_to_global(local_uk)
 
             # get the linearized dynamics
-            A, B = self.get_linearized_discrete_dynamics(xx[k], global_uk)
+            A, B = self.get_linearized_discrete_dynamics(xx[k], uu[k])
+            # print(f"uu[k].shape: {uu[k].shape}")
 
             # apply hessian running cost
             Qk = self.hess_running_cost(xx[k], uu[k])
@@ -299,6 +307,7 @@ class skid_iLQR(object):
 
             # write expansion coefficients
             Qx = lx + A.T @ gk
+            # print(f"B.shape: {B.shape}")
             Qu = lu + B.T @ gk  # TODO: lu is 2x1 and B is 3x1; when should I convert u?
             Qxx = lxx + A.T @ Hk @ A
             Quu = luu + B.T @ Hk @ B
@@ -312,6 +321,8 @@ class skid_iLQR(object):
 
             gk = Qx - Kk.T @ Quu @ dk
             Hk = Qxx - Kk.T @ Quu @ Kk
+            # print("Kk", Kk)
+            # print("dd", dk)
 
         return dd, KK
 
@@ -326,11 +337,13 @@ class skid_iLQR(object):
         :return: xx, uu, KK, the input and state trajectory and associated sequence of LQR gains
         """
         assert (len(uu_guess) == self.N - 1)
-
+        assert (uu_guess[0].shape[0] == 2)
         # Get an initial, dynamically consistent guess for xx by simulating the skid steer
         xx = [x]
+        # print("initial xx", xx) just zeros
         for k in range(self.N - 1):
             xx.append(sim_skid_iLQR.F(xx[k], uu_guess[k], self.dt))
+        # print("after sim xx", xx)
 
         Jprev = np.inf
         Jnext = self.total_cost(xx, uu_guess)
@@ -338,14 +351,15 @@ class skid_iLQR(object):
         KK = None
 
         i = 0
-        print(f'cost: {Jnext}')
+        # print(f'cost: {Jnext}')
         while np.abs(Jprev - Jnext) > self.tol and i < self.max_iter:
             dd, KK = self.backward_pass(xx, uu)
             xx, uu = self.forward_pass(xx, uu, dd, KK)
-            print(f"xx while: {xx}")
+            # print("inside J stuff xx", xx)
+
             Jprev = Jnext
             Jnext = self.total_cost(xx, uu)
-            print(f'cost: {Jnext}')
+            # print(f'cost: {Jnext}')
             i += 1
         print(f'Converged to cost {Jnext}')
         return xx, uu, KK

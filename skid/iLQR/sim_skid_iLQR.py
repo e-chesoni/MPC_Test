@@ -5,22 +5,24 @@ import matplotlib.pyplot as plt
 
 # Dynamics for the skid Steer
 def _f(x, u):
-  alpha_l = 1
-  alpha_r = 9
-  x_ICR_l = -2
-  x_ICR_r = 2
+    # Skid steer dynamics parameters
+    alpha_l = 0.9464
+    alpha_r = 0.9253
+    x_ICR_l = -0.2758
+    x_ICR_r = 0.2998
+    y_ICR_v = -0.0080
 
-  v_x, v_y, w_z = x[0], x[1], x[2]
-  V_l, V_r = u[0], u[1]
+    A = np.array([[-y_ICR_v * alpha_l, y_ICR_v * alpha_r],
+                  [x_ICR_r * alpha_l, -x_ICR_l * alpha_r],
+                  [-alpha_l, alpha_r]])
 
-  # Calculate continuous-time dynamics for global system
-  xdot = v_x * cos(x[2]) - v_y * sin(x[2])
-  ydot = v_x * sin(x[2]) + v_y * cos(x[2])
-  wdot = (V_r - V_l) / (x_ICR_r - x_ICR_l) * (-alpha_l + alpha_r)  # angular rate between wheels
+    # Calculate continuous-time dynamics for global system
+    R = np.array([[cos(x[2]), -sin(x[2]), 0],  # makes it go left
+                  [sin(x[2]), cos(x[2]), 0],
+                  [0, 0, 1]])
+    sdot = R @ A @ u
 
-  sdot = np.array([xdot, ydot, wdot])
-  return sdot
-
+    return sdot
 
 def F(xc, uc, dt):
   # Simulate the open loop skid steer for one step
