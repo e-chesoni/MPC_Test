@@ -1,5 +1,7 @@
 import numpy as np
+from typing import List, Tuple, Any
 import matplotlib.pyplot as plt
+from numpy import ndarray, dtype
 from numpy.linalg import inv
 from numpy.linalg import cholesky
 from math import sin, cos
@@ -15,13 +17,21 @@ import pydrake.symbolic as sym
 
 from pydrake.all import MonomialBasis, OddDegreeMonomialBasis, Variables
 
+from skid.iLQR.skid_iLQR import skid_iLQR
 from skid.skid_steer_simulator import Skid_Steer_Simulator
 from skid.skid_steer_system import SkidSteerSystem
 
 
-class SkidSteerVehicle(object):
-    def __init__(self, Q, R, Qf):
+class SkidMPC(object):
+    def __init__(self, start, end, u_guess, N, dt, Q, R, Qf):
         print("Init SkidSteerVehicle...")
+
+        self.start = start
+        self.end = end
+        self.u_guess = u_guess
+
+        self.N = N
+        self.dt = dt
 
         self.Q = Q
         self.R = R
@@ -89,7 +99,22 @@ class SkidSteerVehicle(object):
 
     def add_initial_state_constraint(self, prog, x, x_current):
         # TODO: verify you can use the same constraint as quad for initial state
+        print("constraint types:")
+        print(type(x))  # TODO: list in new solver; convert to np.array
+        print(type(x_current))
+        print(type(x[0]))
+
+        print(f"x: {x.shape}")  # TODO: list in new solver; convert to np.array
+        print(f"x_current.shape: {x_current.shape}")
+        print(f"x[0]: {x[0]}")
+
+        print("The first value in x_current and x[0] are:")
+        print(f"x_current[0]: {x_current[0]}")
+        print(f"x[0]: {x[0]}")
+
         for i in range(len(x_current)):
+            print("in i loop...")
+            print(f"x[0][i]: {x[0][i]}")
             prog.AddBoundingBoxConstraint(x_current[i], x_current[i], x[0][i])
 
     def add_input_saturation_constraint(self, prog, x, u, N):
@@ -112,6 +137,20 @@ class SkidSteerVehicle(object):
                 x_next = x[k] + (B_d @ u[k])
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
+    def add_ilqr_constraints(self, prog, x, u, x_ilqr, u_ilqr):
+        for k in range(len(u_ilqr)):
+            for i in range(len(x_ilqr[k])):
+                # Update the state prediction based on iLQR solution
+                x_next_ilqr = x_ilqr[k + 1]
+
+                # Add a constraint to enforce equality between predicted and actual state
+                prog.AddLinearEqualityConstraint(x_next_ilqr[i] - x[k + 1][i], 0)
+
+        for k in range(len(u_ilqr)):
+            for j in range(len(u_ilqr[k])):
+                # Add a constraint to enforce equality between iLQR and actual control input
+                prog.AddLinearEqualityConstraint(u_ilqr[k][j] - u[k][j], 0)
+
     def add_cost(self, prog, x, u, N):
         # TODO: verify you can use the same cost for skid steer simple model
         '''
@@ -125,10 +164,102 @@ class SkidSteerVehicle(object):
             total_cost = state_cost + control_cost
             prog.AddQuadraticCost(total_cost)
 
+    # TODO: modify osc SetupAndSolverQP()
+    # TODO: remove 176 - 198 from osc.py SetupAndSolverQP()
+    # HW5 osc.py SetupAndSolveQP
+    def SetupAndSolveILQR(self, x_current) -> tuple[ndarray[Any, dtype[Any]], Any]:
+
+        # First get the state, time, and fsm state
+        # x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
+        # t = context.get_time()
+        # fsm = get_fsm(t) # TODO: Probably don't need? What was fsm used for in osc
+
+        # TODO: Get from iLQR
+        ilqr = skid_iLQR(self.end, self.N, self.dt, self.Q, self.R, self.Qf)
+        x_sol, u_sol, K_sol = ilqr.calculate_optimal_trajectory(self.start, self.u_guess)
+
+        # Convert lists to arrays
+        x_sol = np.array(x_sol)
+        u_sol = np.array(u_sol)
+
+        # Parameters for the QP
+        # TODO: Use these or self.N and self.dt?
+        N = 10
+        T = 0.1  # 0.01 in iLQR dynamics
+
+        # Initialize mathematical program and declare decision variables
+        prog = MathematicalProgram()
+
+        x = np.zeros((N, 3), dtype="object")
+        for i in range(N):
+            x[i] = prog.NewContinuousVariables(3, "x_" + str(i))
+
+        u = np.zeros((N - 1, 2), dtype="object")
+        for i in range(N - 1):
+            u[i] = prog.NewContinuousVariables(2, "u_" + str(i))
+
+        # TODO: Is this the right way to add constraints?
+        # TODO: How do i add these constraints to variables returned by iLQR
+        # TODO: use these or self.N and self.dt?
+        # Add constraints and cost
+        self.add_initial_state_constraint(prog, x, x_current)  # x should be a decision variable, not a number
+        self.add_input_saturation_constraint(prog, x, u, N)
+        self.add_dynamics_constraint(prog, x, u, N, T)
+        self.add_cost(prog, x, u, N)
+
+        # Solve the QP
+        # TODO: Call custom solver
+        solver = OsqpSolver()
+
+        result = solver.Solve(prog)
+
+        return u_sol, result
+
+    def SolveOldMPC(self, x_current):
+        N = 10
+        T = 0.1
+
+        # Initialize mathematical program and declare decision variables
+        prog = MathematicalProgram()
+
+        x = np.zeros((N, 3), dtype="object")
+        for i in range(N):
+            x[i] = prog.NewContinuousVariables(3, "x_" + str(i))
+
+        u = np.zeros((N - 1, 2), dtype="object")
+        for i in range(N - 1):
+            u[i] = prog.NewContinuousVariables(2, "u_" + str(i))
+
+        # Initialize and call iLQR
+        ilqr = skid_iLQR(self.end, N, T, self.Q, self.R, self.Qf)
+        x_sol, u_sol, K_sol = ilqr.calculate_optimal_trajectory(self.start, self.u_guess)
+
+        # Add constraints and cost
+        self.add_initial_state_constraint(prog, x, x_current)
+        self.add_input_saturation_constraint(prog, x, u, N)
+
+        # Constrain dynamics
+        # Add iLQR-based constraints (instead of dynamics constraint)
+        #self.add_dynamics_constraint(prog, x, u, N, T)
+        self.add_ilqr_constraints(prog, x, u, x_sol, u_sol)
+
+        # Add cost constraint
+        self.add_cost(prog, x, u, N)
+
+        # Solve the QP
+        # TODO: Call custom solver
+        solver = OsqpSolver()  # modify osc setupandsolverqp and call instead of this
+
+        result = solver.Solve(prog)
+
+        return u, result
+
     def compute_mpc_feedback(self, x_current, use_clf=False):
         """
         This function computes the MPC controller input u
         """
+        # TODO: How do we use iLQR x_sol and u_sol instead of these?
+        '''
         # Parameters for the QP
         N = 10
         T = 0.1
@@ -153,8 +284,14 @@ class SkidSteerVehicle(object):
         self.add_cost(prog, x, u, N)
 
         # Solve the QP
-        solver = OsqpSolver()
-        result = solver.Solve(prog)
+        # TODO: Call custom solver
+        #solver = OsqpSolver()  # modify osc setupandsolverqp and call instead of this
+        # remove 176 - 198
+
+        #result = solver.Solve(prog)
+        '''
+        u, result = self.SolveOldMPC(x_current)
+        #u, result = self.SetupAndSolveILQR(x_current)
 
         # Retrieve the controller input from the solution of the optimization problem
         # and use it to compute the MPC input u
@@ -163,6 +300,7 @@ class SkidSteerVehicle(object):
 
         return u_mpc
 
+    # TODO: Only used when running iLQR
     def compute_lqr_feedback(self, x):
         """
         Infinite horizon LQR controller

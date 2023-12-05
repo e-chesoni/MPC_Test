@@ -24,8 +24,8 @@ end = np.zeros(3)
 
 # skid steer iLQR start/end
 start = np.zeros((3,))
-#end = np.array([0.1, 1.0, 0]) # works
-end = np.array([0.2, 0.8, 0])  # really, really slow but also works
+end = np.array([-0.001, 0.001, 0])  # works
+#end = np.array([0.2, 0.8, 0])  # really, really slow but also works
 
 class Model(object):
     def __init__(self):
@@ -54,7 +54,7 @@ class Model(object):
             run_skid_iLQR.run_skid_iLQR(self.start, self.end)
         elif skid_mpc:
             print("Ok, you want to run skid steer MPC...")
-            s = run_skid_MPC.create_skid_steer()
+            s = run_skid_MPC.create_skid_steer(start, end)
             anim, fig = run_skid_MPC.simulate_skid_steer_MPC(s, run_skid_MPC.tf)
         else:
             print("Invalid input; not running any models.")

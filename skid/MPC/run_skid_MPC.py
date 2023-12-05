@@ -7,25 +7,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from skid.MPC.animate_skid_MPC import skid_steer_MPC_animation
-from skid.MPC.skid_MPC import SkidSteerVehicle
+from skid.MPC.skid_MPC import SkidMPC
 from skid.MPC.sim_skid_MPC import simulate_skid_steer
 
 # Global variables
 tf = 10
-def create_skid_steer():
+
+# for MPC iLQR integration
+N = 10  # 3000
+dt = 0.01  # 0.01
+
+def create_skid_steer(start, end):
     """
     Load in the animation function
     """
     # Weights of LQR cost
+    '''
     R = np.eye(2) * 5
     #Q = np.diag([10, 10, 1])
     Q = np.diag([10, 10, 0])
     Qf = Q
+    '''
+
+    N = 10  # 3000
+    dt = 0.01  # 0.01
+
+    Q = .01 * np.eye(3)
+    Q[2, 2] = 0  # Let system turn freely (no cost)
+    R = np.eye(2) * 0.0000001
+
+    Qf = 1e2 * np.eye(3)
+    Qf[2, 2] = 0
+
+    u_guess = [np.zeros((2,))] * (N - 1)
 
     # End time of the simulation
 
     # Construct our skid steer controller
-    return SkidSteerVehicle(Q, R, Qf)
+    return SkidMPC(start, end, u_guess, N, dt, Q, R, Qf)
 
 def simulate_skid_steer_MPC(skid_steer, tf):
     print("Running Skid Steer MPC...")
