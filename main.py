@@ -18,11 +18,14 @@ linearize about each time step in MPC:
 '''
 
 # Global variables
-tf = 10
-
+# Skid Steer MPC start/end
 start = np.array([2, 2, 3])
 end = np.zeros(3)
 
+# skid steer iLQR start/end
+start = np.zeros((3,))
+#end = np.array([0.1, 1.0, 0]) # works
+end = np.array([0.2, 0.8, 0])  # really, really slow but also works
 
 class Model(object):
     def __init__(self):
@@ -30,13 +33,13 @@ class Model(object):
         self.start = np.array([2, 2, 3])
         self.end = np.zeros(3)
 
-    def set_start(self, start):
-        print(f"Setting start to: {start}")
-        self.start = start
+    def set_start(self, s):
+        print(f"Setting start to: {s}")
+        self.start = s
 
-    def set_end(self, end):
-        print(f"Setting destiination to: {end}")
-        self.end = end
+    def set_end(self, e):
+        print(f"Setting destiination to: {e}")
+        self.end = e
 
     def run_model(self, quad_ilqr, quad_mpc, skid_ilqr, skid_mpc):
         if quad_ilqr:
@@ -48,32 +51,13 @@ class Model(object):
             anim, fig = run_quad_MPC.simulate_quadrotor_MPC(q, run_quad_MPC.tf)
         elif skid_ilqr:
             print("Ok, you want to run skid steer iLQR...")
-            run_skid_iLQR.run_skid_iLQR()
+            run_skid_iLQR.run_skid_iLQR(self.start, self.end)
         elif skid_mpc:
             print("Ok, you want to run skid steer MPC...")
             s = run_skid_MPC.create_skid_steer()
             anim, fig = run_skid_MPC.simulate_skid_steer_MPC(s, run_skid_MPC.tf)
         else:
             print("Invalid input; not running any models.")
-
-
-def run_model(quad_ilqr, quad_mpc, skid_ilqr, skid_mpc):
-    if quad_ilqr:
-        print("Ok, you want to run quadrotor iLQR...")
-        run_quad_iLQR.run_quad_iLQR()
-    elif quad_mpc:
-        print("Ok, you want to run quadrotor mpc...")
-        q = run_quad_MPC.create_quadrotor()
-        anim, fig = run_quad_MPC.simulate_quadrotor_MPC(q, run_quad_MPC.tf)
-    elif skid_ilqr:
-        print("Ok, you want to run skid steer iLQR...")
-        run_skid_iLQR.run_skid_iLQR()
-    elif skid_mpc:
-        print("Ok, you want to run skid steer MPC...")
-        s = run_skid_MPC.create_skid_steer()
-        anim, fig = run_skid_MPC.simulate_skid_steer_MPC(s, run_skid_MPC.tf)
-    else:
-        print("Invalid input; not running any models.")
 
 
 if __name__ == '__main__':

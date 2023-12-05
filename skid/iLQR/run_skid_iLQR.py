@@ -7,14 +7,12 @@ from skid.iLQR.skid_iLQR import skid_iLQR
 import matplotlib.pyplot as plt
 
 
-def run_skid_iLQR():
+def run_skid_iLQR(x0, x_goal):
     print("Running Skid Steer iLQR...")
 
     # Set up the iLQR problem
     N = 3000
     dt = 0.01
-    x_goal = np.array([0.1, 1.0, 0])
-    x_goal = np.array([0.2, 0.8, 0])  # really, really slow but works
 
     # TODO: Adjust the costs as needed for convergence
     Q = .01 * np.eye(3)
@@ -28,10 +26,7 @@ def run_skid_iLQR():
 
     ilqr = skid_iLQR(x_goal, N, dt, Q, R, Qf)
 
-    # Initial state at rest at the origin
-    x0 = np.zeros((3,))
-
-    # initial guess for the input is just hovering in place
+    # initial guess for the input
     u_guess = [np.ones((2,))] * (N - 1)
 
     x_sol, u_sol, K_sol = ilqr.calculate_optimal_trajectory(x0, u_guess)
