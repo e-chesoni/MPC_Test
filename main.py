@@ -34,11 +34,11 @@ class Model(object):
         self.end = np.zeros(3)
 
     def set_start(self, s):
-        print(f"Setting start to: {s}")
+        print(f"Setting Main model start to: {s}")
         self.start = s
 
     def set_end(self, e):
-        print(f"Setting destiination to: {e}")
+        print(f"Setting Main model destination to: {e}")
         self.end = e
 
     def run_model(self, quad_ilqr, quad_mpc, skid_ilqr, skid_mpc):
@@ -64,6 +64,6 @@ if __name__ == '__main__':
     m = Model()
     m.set_start(start)
     m.set_end(end)
-    m.run_model(False, False, True, False)
+    m.run_model(False, False, False, True)
 
     print("done")

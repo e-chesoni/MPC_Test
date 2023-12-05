@@ -1,11 +1,8 @@
 import numpy as np
 from numpy import ndarray, dtype, floating
-from scipy.signal import cont2discrete
 from typing import List, Tuple, Any
-from scipy.integrate import solve_ivp
-from skid.iLQR.sim_skid_iLQR import Skid_Steer_Simulator
-
-from math import sin, cos
+from skid.skid_steer_simulator import Skid_Steer_Simulator
+from skid.skid_steer_system import SkidSteerSystem
 
 
 class skid_iLQR(object):
@@ -21,29 +18,10 @@ class skid_iLQR(object):
         """
 
         # starting position
-        self.m = 1
+        #self.m = 1
 
-        # Skid steer dynamics parameters
-        self.alpha_l = 0.9464
-        self.alpha_r = 0.9253
-        self.x_ICR_l = -0.2758
-        self.x_ICR_r = 0.2998
-        self.y_ICR_v = -0.0080
-
-        # Compute A matrix based on provided dynamics (paper)
-        '''
-        self.A = 1 / (self.x_ICR_r - self.x_ICR_l) * np.array([
-            [-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
-            [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
-            [-self.alpha_l, self.alpha_r]
-        ])
-        '''
-        self.A = np.array([[-self.y_ICR_v * self.alpha_l, self.y_ICR_v * self.alpha_r],
-                      [self.x_ICR_r * self.alpha_l, -self.x_ICR_l * self.alpha_r],
-                      [-self.alpha_l, self.alpha_r]])
-
-        # simulator
-        self.sim_skid_iLQR = Skid_Steer_Simulator(self.A)
+        # Simulator
+        self.sim_skid_iLQR = Skid_Steer_Simulator()
 
         # State and input dimensions
         self.nx = 3
@@ -81,8 +59,8 @@ class skid_iLQR(object):
         # Use I with NxN dim where N = len(xdot)
         A = np.eye(3)
 
-        A_kinematics = self.get_kinematics()
-        R = self.rotate(x)
+        A_kinematics = SkidSteerSystem.get_kinematics()
+        R = SkidSteerSystem.rotate(x)
 
         B = R @ A_kinematics
 
@@ -106,7 +84,7 @@ class skid_iLQR(object):
 
         return Ad, Bd
 
-    def running_cost(self, xk: np.ndarray, uk: np.ndarray) -> float:
+    def running_cost(self, xk: np.ndarray, uk: np.ndarray) -> ndarray[Any, dtype[floating[Any]]]:
         """
         :param xk: state
         :param uk: input
@@ -195,16 +173,6 @@ class skid_iLQR(object):
         H = self.Qf
 
         return H
-
-    def rotate(self, x):
-        R = np.array([[cos(x[2]), -sin(x[2]), 0],
-                      [sin(x[2]), cos(x[2]), 0],
-                      [0, 0, 1]])
-
-        return R
-
-    def get_kinematics(self):
-        return self.A
 
     def forward_pass(self, xx: List[np.ndarray], uu: List[np.ndarray], dd: List[np.ndarray], KK: List[np.ndarray]) -> \
             Tuple[List[np.ndarray], List[np.ndarray]]:

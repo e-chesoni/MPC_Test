@@ -1,7 +1,4 @@
 import numpy as np
-import importlib
-import quad.iLQR.quad_iLQR
-# importlib.reload(quad_iLQR)
 from skid.iLQR.skid_iLQR import skid_iLQR
 
 import matplotlib.pyplot as plt
@@ -16,13 +13,11 @@ def run_skid_iLQR(x0, x_goal):
 
     # TODO: Adjust the costs as needed for convergence
     Q = .01 * np.eye(3)
-    Q[2, 2] = 0
+    Q[2, 2] = 0  # Let system turn freely (no cost)
+    R = np.eye(2) * 0.001
 
-    # Q[-1,-1] = 0.1
     Qf = 1e2 * np.eye(3)
     Qf[2, 2] = 0
-    # Qf = Q
-    R = np.eye(2) * 0.001
 
     ilqr = skid_iLQR(x_goal, N, dt, Q, R, Qf)
 

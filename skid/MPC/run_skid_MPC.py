@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from skid.MPC.animate_skid_MPC import skid_steer_MPC_animation
-from skid.MPC.skid_steer import SkidSteerVehicle
+from skid.MPC.skid_MPC import SkidSteerVehicle
 from skid.MPC.sim_skid_MPC import simulate_skid_steer
 
 # Global variables
@@ -18,8 +18,8 @@ def create_skid_steer():
     """
     # Weights of LQR cost
     R = np.eye(2) * 5
-    #Q = np.diag([10, 10, 1])  # tax theta the least so car can turn
-    Q = np.diag([10, 10, 1])
+    #Q = np.diag([10, 10, 1])
+    Q = np.diag([10, 10, 0])
     Qf = Q
 
     # End time of the simulation
@@ -35,6 +35,9 @@ def simulate_skid_steer_MPC(skid_steer, tf):
 
     # Set desired position
     x_d = np.zeros(3)
+    x_d = np.array([0, -4, 0])
+    x_d = np.array([0, 4, 0])
+    # TODO: Fix trajectory; seems to have a very hard time turning
     skid_steer.set_destination(x_d)
 
     # Run MPC
