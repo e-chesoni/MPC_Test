@@ -1,6 +1,7 @@
-# MPCs
 import numpy as np
+from context import *
 
+# MPCs
 import quad.MPC.run_quad_MPC as run_quad_MPC
 import skid.MPC.run_skid_MPC as run_skid_MPC
 
@@ -9,29 +10,20 @@ import quad.iLQR.run_quad_iLQR as run_quad_iLQR
 import skid.iLQR.run_skid_iLQR as run_skid_iLQR
 
 
-'''
-TODO: MPC + iLQR
-Incorp. ilqr with mpc:
-you get uu, xx, and kk from ilqr
-linearize about each time step in MPC:
-    Get derivative of uu and xx
-'''
-
-# Global variables
-# Skid Steer MPC start/end
-start = np.array([2, 2, 3])
-end = np.zeros(3)
-
-# skid steer iLQR start/end
-start = np.zeros((3,))
-end = np.array([-0.001, 0.001, 0])  # works
-#end = np.array([0.2, 0.8, 0])  # really, really slow but also works
-
 class Model(object):
-    def __init__(self):
+    def __init__(self, context):
         super().__init__()
         self.start = np.array([2, 2, 3])
         self.end = np.zeros(3)
+        self.context = context
+
+        Q = .01 * np.eye(3)
+        Q[2, 2] = 0  # Let system turn freely (no cost)
+        R = np.eye(2) * 0.0000001
+
+        Qf = 1e2 * np.eye(3)
+        Qf[2, 2] = 0
+        self.context.set_cost(Q, R, Qf)
 
     def set_start(self, s):
         print(f"Setting Main model start to: {s}")
@@ -51,17 +43,20 @@ class Model(object):
             anim, fig = run_quad_MPC.simulate_quadrotor_MPC(q, run_quad_MPC.tf)
         elif skid_ilqr:
             print("Ok, you want to run skid steer iLQR...")
-            run_skid_iLQR.run_skid_iLQR(self.start, self.end)
+            #run_skid_iLQR.run_skid_iLQR(self.context.start, self.context.end, self.context.N, self.context.dt)
+
+            run_skid_iLQR.run_skid_iLQR(self.context)
         elif skid_mpc:
             print("Ok, you want to run skid steer MPC...")
-            s = run_skid_MPC.create_skid_steer(start, end)
-            anim, fig = run_skid_MPC.simulate_skid_steer_MPC(s, run_skid_MPC.tf)
+            skid = run_skid_MPC.create_skid_steer(self.context)
+            anim, fig = run_skid_MPC.simulate_skid_steer_MPC(skid, self.context)
         else:
             print("Invalid input; not running any models.")
 
 
 if __name__ == '__main__':
-    m = Model()
+    c = Context(start, end, N, dt, tf)
+    m = Model(c)
     m.set_start(start)
     m.set_end(end)
     m.run_model(False, False, False, True)

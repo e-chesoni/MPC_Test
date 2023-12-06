@@ -11,6 +11,7 @@ def skid_steer_MPC_animation(x, x_d, tf, n_frames=60):
     n_samples = 1000
     t_samples = np.linspace(0.0, tf, n_samples)
     x_des = np.zeros((n_samples, 3))
+
     for i in range(t_samples.shape[0]):
         x_des[i] = x_d
 
@@ -51,8 +52,8 @@ def skid_steer_MPC_animation(x, x_d, tf, n_frames=60):
         center_z = z[i]
 
         # Define the width and height of the box
-        box_width = a * 0.25
-        box_height = a * 0.5
+        box_width = a * 0.025
+        box_height = a * 0.05
 
         # Calculate the orientation angle (in degrees)
         angle_deg = degrees(theta[i])

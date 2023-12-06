@@ -1,23 +1,16 @@
 import numpy as np
 from skid.iLQR.skid_iLQR import skid_iLQR
-
+from context import *
 import matplotlib.pyplot as plt
 
-
-def run_skid_iLQR(x0, x_goal):
+#def run_skid_iLQR(x0, x_goal, N, dt):
+def run_skid_iLQR(context):
     print("Running Skid Steer iLQR...")
-
-    # Set up the iLQR problem
-    N = 10  # 3000
-    dt = 0.01  # 0.01
-
-    # TODO: Adjust the costs as needed for convergence
-    Q = .01 * np.eye(3)
-    Q[2, 2] = 0  # Let system turn freely (no cost)
-    R = np.eye(2) * 0.0000001
-
-    Qf = 1e2 * np.eye(3)
-    Qf[2, 2] = 0
+    x0 = context.start
+    x_goal = context.end
+    Q = context.Q
+    R = context.R
+    Qf = context.Qf
 
     ilqr = skid_iLQR(x_goal, N, dt, Q, R, Qf)
 

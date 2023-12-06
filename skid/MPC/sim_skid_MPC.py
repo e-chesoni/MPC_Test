@@ -2,19 +2,17 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 
-def simulate_skid_steer(x0, tf, skid_steer, use_mpc=True, use_mpc_with_clf=False, use_clf_qp=False):
+def simulate_skid_steer(x0, tf, dt, skid_steer, use_mpc=True, use_mpc_with_clf=False, use_clf_qp=False):
     print("Simulating skid-steer")
     # Simulates a stabilized maneuver on the 2D skid
     # system, with an initial value of x0
     t0 = 0.0
-    n_points = 1000
-
-    dt = 1e-2
 
     x = [x0]
-    #u = [np.zeros((3,))]
     u = [np.zeros((2,))]
     t = [t0]
+
+    test_itr = 0
 
     while np.linalg.norm(np.array(x[-1][0:2])) > 1e-3 and t[-1] < tf:
         current_time = t[-1]
@@ -22,7 +20,9 @@ def simulate_skid_steer(x0, tf, skid_steer, use_mpc=True, use_mpc_with_clf=False
         current_u_command = np.zeros(2)
 
         if use_mpc:
+            print(f"test_itr: {test_itr}") # running 1000 times but why?
             current_u_command = skid_steer.compute_mpc_feedback(current_x, use_mpc_with_clf)
+            test_itr += 1
         elif use_clf_qp:
             current_u_command = skid_steer.compute_clf_qp_feedback(current_x)
         else:
