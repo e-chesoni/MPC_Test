@@ -18,7 +18,7 @@ import pydrake.symbolic as sym
 from pydrake.all import MonomialBasis, OddDegreeMonomialBasis, Variables
 
 from skid.iLQR.skid_iLQR import skid_iLQR
-from skid.skid_steer_simulator import Skid_Steer_Simulator
+from skid.skid_state_calc import SkidSteerCalculateState
 from skid.skid_steer_system import SkidSteerSystem
 
 
@@ -30,7 +30,7 @@ class SkidMPC(object):
         self.end = end
         self.u_guess = u_guess
 
-        self.N = N
+        self.N = 10  # TODO: NOTE -- using different N to calculate iLQR and MPC
         self.dt = dt
 
         self.Q = Q
@@ -73,7 +73,7 @@ class SkidMPC(object):
 
     # Continuous-time dynamics for the skid-steer vehicle
     def continuous_time_full_dynamics(self, x, u):
-        sdot = Skid_Steer_Simulator.f(x, u)
+        sdot = SkidSteerCalculateState.f(x, u)
 
         return sdot
 
@@ -128,16 +128,10 @@ class SkidMPC(object):
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
     def add_ilqr_constraints(self, prog, x, u, x_ilqr, u_ilqr, step):
-        '''
-        print(f"x_ilqr: {x_ilqr}")
-        print(f"u_ilqr: {u_ilqr}")
-        print(f"step: {step}")
-        '''
         for k in range(len(u_ilqr)):
             for i in range(len(x_ilqr[k])):
                 # Update the state prediction based on iLQR solution
                 x_next_ilqr = x_ilqr[k + 1] * step
-                #print(f"x_next_ilqr: {x_next_ilqr}")
 
                 # Add a constraint to enforce equality between predicted and actual state
                 prog.AddLinearEqualityConstraint(x_next_ilqr[i] - x[k + 1][i], 0)
@@ -148,20 +142,18 @@ class SkidMPC(object):
                 prog.AddLinearEqualityConstraint(u_ilqr[k][j] - u[k][j], 0)
 
     def add_cost(self, prog, x, u, N):
-        # TODO: verify you can use the same cost for skid steer simple model
         '''
         for k in range(N - 1):
             cost = x[k].T @ self.Q @ x[k] + u[k].T @ self.R @ u[k]
             prog.AddQuadraticCost(cost)
         '''
+        # TODO: Try original cost
         for k in range(N - 1):
             state_cost = (x[k] - self.x_d).T @ self.Q @ (x[k] - self.x_d)
             control_cost = u[k].T @ self.R @ u[k]
             total_cost = state_cost + control_cost
             prog.AddQuadraticCost(total_cost)
 
-    # TODO: modify osc SetupAndSolverQP()
-    # TODO: remove 176 - 198 from osc.py SetupAndSolverQP()
     # HW5 osc.py SetupAndSolveQP
     def SetupAndSolveILQR(self, x_current):
         # Initialize mathematical program and declare decision variables
@@ -182,9 +174,9 @@ class SkidMPC(object):
         # TODO: Remove if not using
         step = math.floor(self.dt_step/100)
 
-        # Constrain dynamics
-        # Add iLQR-based constraints (instead of dynamics constraint)
-        #self.add_dynamics_constraint(prog, x, u, self.N, self.dt)
+        # Constrain dynamics (ONLY USE ONE OF THESE)
+        #self.add_dynamics_constraint(prog, x, u, self.N, self.dt)  # Works, but vehicle is very large
+        # Add iLQR constraint
         self.add_ilqr_constraints(prog, x, u, self.x_sol, self.u_sol, step)
 
         # TODO: Remove if not using
@@ -202,8 +194,6 @@ class SkidMPC(object):
 
         return u, result
 
-    # TODO: runs for ever time step
-    # TODO: need to calculate iLQR ONCE and get the next iteration at each timestep
     def compute_mpc_feedback(self, x_current, use_clf=False):
         """
         This function computes the MPC controller input u
@@ -212,12 +202,9 @@ class SkidMPC(object):
 
         # Retrieve the controller input from the solution of the optimization problem
         # and use it to compute the MPC input u
-        u_0 = result.GetSolution(u[0])  # TODO: FIX; returns nothing with iLQR constraint
+        u_0 = result.GetSolution(u[0])
         u_mpc = u_0 + self.u_d()
-        '''
-        print(f"u_0: {u_0}")
-        print(f"u_mpc: {u_mpc}")
-        '''
+
         return u_mpc
 
     # TODO: Only used when running LQR

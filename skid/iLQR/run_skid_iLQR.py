@@ -15,11 +15,9 @@ def run_skid_iLQR(context):
     ilqr = skid_iLQR(x_goal, N, dt, Q, R, Qf)
 
     # initial guess for the input
-    u_guess = [np.zeros((2,))] * (N - 1)
+    u_guess = context.u_guess
 
     x_sol, u_sol, K_sol = ilqr.calculate_optimal_trajectory(x0, u_guess)
-    print(np.array(x_sol)[:, -1])
-    print(u_sol)
 
     # Visualize the solution
     xx = np.array(x_sol)

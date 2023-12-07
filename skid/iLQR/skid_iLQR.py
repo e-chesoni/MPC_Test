@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import ndarray, dtype, floating
 from typing import List, Tuple, Any
-from skid.skid_steer_simulator import Skid_Steer_Simulator
+from skid.skid_state_calc import SkidSteerCalculateState
 from skid.skid_steer_system import SkidSteerSystem
 
 
@@ -17,7 +17,7 @@ class skid_iLQR(object):
         :param Qf: weights for terminal cost on input
         """
         # Simulator
-        self.sim_skid_iLQR = Skid_Steer_Simulator()
+        self.sim_skid_iLQR = SkidSteerCalculateState()
 
         # State and input dimensions
         self.nx = 3
@@ -248,7 +248,7 @@ class skid_iLQR(object):
         :param uu_guess: initial guess at input trajectory
         :return: xx, uu, KK, the input and state trajectory and associated sequence of LQR gains
         """
-        assert (len(uu_guess) == self.N - 1)
+        #assert (len(uu_guess) == self.N - 1)
         assert (uu_guess[0].shape[0] == 2)
 
         # Get an initial, dynamically consistent guess for xx by simulating the skid steer

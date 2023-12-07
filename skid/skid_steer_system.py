@@ -20,11 +20,9 @@ class SkidSteerSystem:
                      [x_ICR_r * alpha_l, -x_ICR_l * alpha_r],
                      [-alpha_l, alpha_r]])
 
-        # Uncomment to apply scaling factor to A (as done in paper)
-        '''
+        # Apply scaling factor to A (as done in paper)
         scale_factor = 1 / (x_ICR_r - x_ICR_l)
         A = scale_factor * A
-        '''
 
         return A
 

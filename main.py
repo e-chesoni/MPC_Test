@@ -30,8 +30,6 @@ class Model(object):
             anim, fig = run_quad_MPC.simulate_quadrotor_MPC(q, run_quad_MPC.tf)
         elif skid_ilqr:
             print("Ok, you want to run skid steer iLQR...")
-            #run_skid_iLQR.run_skid_iLQR(self.context.start, self.context.end, self.context.N, self.context.dt)
-
             run_skid_iLQR.run_skid_iLQR(self.context)
         elif skid_mpc:
             print("Ok, you want to run skid steer MPC...")
