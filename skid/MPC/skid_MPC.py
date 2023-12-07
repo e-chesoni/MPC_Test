@@ -128,13 +128,15 @@ class SkidMPC(object):
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
     def add_ilqr_constraints(self, prog, x, u, x_ilqr, u_ilqr, step):
+        '''
         print(f"x_ilqr: {x_ilqr}")
         print(f"u_ilqr: {u_ilqr}")
-
+        print(f"step: {step}")
+        '''
         for k in range(len(u_ilqr)):
             for i in range(len(x_ilqr[k])):
                 # Update the state prediction based on iLQR solution
-                x_next_ilqr = x_ilqr[k + 1]
+                x_next_ilqr = x_ilqr[k + 1] * step
                 #print(f"x_next_ilqr: {x_next_ilqr}")
 
                 # Add a constraint to enforce equality between predicted and actual state
@@ -173,21 +175,19 @@ class SkidMPC(object):
         for i in range(self.N - 1):
             u[i] = prog.NewContinuousVariables(2, "u_" + str(i))
 
-        # TODO: test ilqr init in skid steer __init__
-
         # Add constraints and cost
         self.add_initial_state_constraint(prog, x, x_current)
         #self.add_input_saturation_constraint(prog, x, u, self.N)  # PROBLEMATIC CONSTRAINTS HERE
-        if self.dt_step != 0:
-            print(f"math.floor(self.dt_step): {math.floor(self.dt_step/100)}")
 
+        # TODO: Remove if not using
         step = math.floor(self.dt_step/100)
 
         # Constrain dynamics
         # Add iLQR-based constraints (instead of dynamics constraint)
         #self.add_dynamics_constraint(prog, x, u, self.N, self.dt)
         self.add_ilqr_constraints(prog, x, u, self.x_sol, self.u_sol, step)
-        # TODO: Update ilqr_iter
+
+        # TODO: Remove if not using
         self.dt_step += 1
 
         # Add cost constraint
@@ -213,10 +213,11 @@ class SkidMPC(object):
         # Retrieve the controller input from the solution of the optimization problem
         # and use it to compute the MPC input u
         u_0 = result.GetSolution(u[0])  # TODO: FIX; returns nothing with iLQR constraint
-        print(f"u_0: {u_0}")
         u_mpc = u_0 + self.u_d()
+        '''
+        print(f"u_0: {u_0}")
         print(f"u_mpc: {u_mpc}")
-
+        '''
         return u_mpc
 
     # TODO: Only used when running LQR

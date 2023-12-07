@@ -16,10 +16,6 @@ class skid_iLQR(object):
         :param R: weights for running cost on input
         :param Qf: weights for terminal cost on input
         """
-
-        # starting position
-        #self.m = 1
-
         # Simulator
         self.sim_skid_iLQR = Skid_Steer_Simulator()
 
@@ -44,6 +40,8 @@ class skid_iLQR(object):
         self.Q = Q
         self.R = R
         self.Qf = Qf
+
+        print(f"Calculating iLQR trajectory to {x_goal}")
 
     def total_cost(self, xx, uu):
         J = sum([self.running_cost(xx[k], uu[k]) for k in range(self.N - 1)])
@@ -265,7 +263,6 @@ class skid_iLQR(object):
         KK = None
 
         i = 0
-        # print(f'cost: {Jnext}')
         while np.abs(Jprev - Jnext) > self.tol and i < self.max_iter:
             dd, KK = self.backward_pass(xx, uu)
             xx, uu = self.forward_pass(xx, uu, dd, KK)

@@ -13,25 +13,12 @@ import skid.iLQR.run_skid_iLQR as run_skid_iLQR
 class Model(object):
     def __init__(self, context):
         super().__init__()
-        self.start = np.array([2, 2, 3])
-        self.end = np.zeros(3)
         self.context = context
 
-        Q = .01 * np.eye(3)
-        Q[2, 2] = 0  # Let system turn freely (no cost)
-        R = np.eye(2) * 0.0000001
-
-        Qf = 1e2 * np.eye(3)
-        Qf[2, 2] = 0
-        self.context.set_cost(Q, R, Qf)
-
-    def set_start(self, s):
-        print(f"Setting Main model start to: {s}")
-        self.start = s
-
-    def set_end(self, e):
-        print(f"Setting Main model destination to: {e}")
-        self.end = e
+        print(f"{'*' * 70}\n"
+              f"{' ' * 20}Creating and Running Model...{' ' * 20}\n"
+              f"{'*' * 70}\n"
+              )
 
     def run_model(self, quad_ilqr, quad_mpc, skid_ilqr, skid_mpc):
         if quad_ilqr:
@@ -53,12 +40,12 @@ class Model(object):
         else:
             print("Invalid input; not running any models.")
 
+        print(f"\n{'*' * 70}\n"
+              f"{' ' * 20}Trajectory Simulation Complete.{' ' * 20}\n"
+              f"{'*' * 70}\n")
+
 
 if __name__ == '__main__':
-    c = Context(start, end, N, dt, tf)
+    c = Context()
     m = Model(c)
-    m.set_start(start)
-    m.set_end(end)
     m.run_model(False, False, False, True)
-
-    print("done")

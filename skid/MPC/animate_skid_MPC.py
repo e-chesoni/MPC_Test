@@ -47,31 +47,34 @@ def skid_steer_MPC_animation(x, x_d, tf, n_frames=60):
 
         # THIS IS TO MAKE THE BOX
         # Calculate the center of the box
-
         center_y = y[i]
         center_z = z[i]
 
         # Define the width and height of the box
         box_width = a * 0.025
-        box_height = a * 0.05
+        box_height = a * 0.15
 
         # Calculate the orientation angle (in degrees)
         angle_deg = degrees(theta[i])
 
         # Create a rectangle
-        # The anchor point (bottom left corner of the rectangle) is calculated by subtracting half the width and height from the center coordinates
-        rect = Rectangle((center_y - box_width / 16, center_z - box_height / 16), box_width, box_height, color='green',
-                         angle=angle_deg)
+        # Do this twice to "center the car"
+        rect = Rectangle((center_y, center_z), box_width, box_height/2, color='green', angle=angle_deg)
+        rect2 = Rectangle((center_y, center_z), -box_width, box_height/2, color='green', angle=angle_deg)
 
         # Calculate the coordinates for the front part of the box
         front_height = box_height / 4
 
         # Create a rectangle for the front part with a different color (e.g., red)
-        front_rect = Rectangle((center_y - box_width / 16, center_z - front_height / 16), box_width, front_height,
-                        color='red', angle=angle_deg)
+        front_rect = Rectangle((center_y - front_height / 16, center_z - front_height / 16),
+                               box_width, front_height, color='red', angle=angle_deg)
+        front_rect2 = Rectangle((center_y - front_height / 16, center_z - front_height / 16),
+                                -box_width, front_height, color='red', angle=angle_deg)
 
         ax.add_patch(rect)
+        ax.add_patch(rect2)
         ax.add_patch(front_rect)
+        ax.add_patch(front_rect2)
         plot = [rect]  # plot needs to be a list of artists
         # END ADDED BOX CODE
 
