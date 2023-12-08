@@ -46,4 +46,4 @@ class Model(object):
 if __name__ == '__main__':
     c = Context()
     m = Model(c)
-    m.run_model(False, False, False, True)
+    m.run_model(False, False, True, False)
