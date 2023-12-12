@@ -30,7 +30,7 @@ class SkidMPC(object):
         self.end = end
         self.u_guess = u_guess
 
-        self.N = 10  # TODO: NOTE -- using different N to calculate iLQR and MPC
+        self.N = N  # TODO: NOTE -- using different N to calculate iLQR and MPC
         self.dt = dt
 
         self.Q = Q
@@ -45,7 +45,45 @@ class SkidMPC(object):
         self.dt_step = 0
         self.ilqr = skid_iLQR(self.end, self.N, self.dt, self.Q, self.R, self.Qf)
         self.x_sol, self.u_sol, self.K_sol = self.ilqr.calculate_optimal_trajectory(self.start, self.u_guess)
-        #print(f"len(x_sol): {len(x_sol)}")
+
+        # Modified x_sol for straight line
+        x_sol_straight = [np.array([0., 0.01, 0.]),
+                          np.array([0.001, 0.01, 0.]),
+                          np.array([0.002, 0.01, 0.]),
+                          np.array([0.003, 0.01, 0.]),
+                          np.array([0.004, 0.01, 0.]),
+                          np.array([0.005, 0.01, 0.]),
+                          np.array([0.006, 0.01, 0.]),
+                          np.array([0.007, 0.01, 0.]),
+                          np.array([0.008, 0.01, 0.]),
+                          np.array([0.009, 0.01, 0.])]
+
+        # Modified u_sol for straight line
+        u_sol_straight = [np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421]),
+                          np.array([-1.61875726, 1.48081421])]
+
+        u_sol_straight = [np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0]),
+                          np.array([1.0, -1.0])]
+
+        #self.x_sol = x_sol_straight
+        #self.u_sol = u_sol_straight
+
+        print(f"x_sol: {self.x_sol}")
+        print(f"u_sol: {self.u_sol}")
 
         # Vehicle parameters
         '''
@@ -114,7 +152,6 @@ class SkidMPC(object):
                 prog.AddBoundingBoxConstraint(self.umin, self.umax, u[k][wheel])
 
     def add_dynamics_constraint(self, prog, x, u, N, T):
-        # TODO: Update to use iLQR
         A = SkidSteerSystem.get_kinematics()
         for k in range(N - 1):
             for i in range(len(x[k])):
@@ -127,19 +164,28 @@ class SkidMPC(object):
                 x_next = x[k] + (B_d @ u[k])
                 prog.AddLinearEqualityConstraint(x_next[i] - x[k + 1][i], 0)
 
-    def add_ilqr_constraints(self, prog, x, u, x_ilqr, u_ilqr, step):
-        for k in range(len(u_ilqr)):
-            for i in range(len(x_ilqr[k])):
-                # Update the state prediction based on iLQR solution
-                x_next_ilqr = x_ilqr[k + 1] * step
+    def add_ilqr_constraints(self, prog, x, u):
+        slack_tol = 0.7  # tolerance
 
+        for k in range(len(self.u_sol)):
+            for i in range(len(self.x_sol[k])):
                 # Add a constraint to enforce equality between predicted and actual state
-                prog.AddLinearEqualityConstraint(x_next_ilqr[i] - x[k + 1][i], 0)
+                #prog.AddLinearEqualityConstraint(self.x_sol[k + 1][i] - x[k + 1][i], 0)
 
-        for k in range(len(u_ilqr)):
-            for j in range(len(u_ilqr[k])):
+                # Add a bounding box constraint to enforce closeness between predicted and actual state
+                x_lb = self.x_sol[k + 1][i] - slack_tol
+                x_ub = self.x_sol[k + 1][i] + slack_tol
+                prog.AddBoundingBoxConstraint(x_lb, x_ub, x[k + 1][i])
+
+        for k in range(len(self.u_sol)):
+            for j in range(len(self.u_sol[k])):
                 # Add a constraint to enforce equality between iLQR and actual control input
-                prog.AddLinearEqualityConstraint(u_ilqr[k][j] - u[k][j], 0)
+                #prog.AddLinearEqualityConstraint(u_ilqr[k][j] - u[k][j], 0)
+
+                # Add a bounding box constraint to enforce closeness between iLQR and actual control input
+                u_lb = self.u_sol[k][j] - slack_tol
+                u_ub = self.u_sol[k][j] + slack_tol
+                prog.AddBoundingBoxConstraint( u_lb, u_ub, u[k][j])
 
     def add_cost(self, prog, x, u, N):
         '''
@@ -149,7 +195,7 @@ class SkidMPC(object):
         '''
         # TODO: Try original cost
         for k in range(N - 1):
-            state_cost = (x[k] - self.x_d).T @ self.Q @ (x[k] - self.x_d)
+            state_cost = (x[k] - self.x_sol[k]).T @ self.Q @ (x[k] - self.x_sol[k])
             control_cost = u[k].T @ self.R @ u[k]
             total_cost = state_cost + control_cost
             prog.AddQuadraticCost(total_cost)
@@ -171,16 +217,10 @@ class SkidMPC(object):
         self.add_initial_state_constraint(prog, x, x_current)
         #self.add_input_saturation_constraint(prog, x, u, self.N)  # PROBLEMATIC CONSTRAINTS HERE
 
-        # TODO: Remove if not using
-        step = math.floor(self.dt_step/100)
-
         # Constrain dynamics (ONLY USE ONE OF THESE)
         #self.add_dynamics_constraint(prog, x, u, self.N, self.dt)  # Works, but vehicle is very large
         # Add iLQR constraint
-        self.add_ilqr_constraints(prog, x, u, self.x_sol, self.u_sol, step)
-
-        # TODO: Remove if not using
-        self.dt_step += 1
+        self.add_ilqr_constraints(prog, x, u)
 
         # Add cost constraint
         self.add_cost(prog, x, u, self.N)
@@ -198,6 +238,7 @@ class SkidMPC(object):
         """
         This function computes the MPC controller input u
         """
+
         u, result = self.SetupAndSolveILQR(x_current)
 
         # Retrieve the controller input from the solution of the optimization problem
@@ -207,7 +248,6 @@ class SkidMPC(object):
 
         return u_mpc
 
-    # TODO: Only used when running LQR
     def compute_lqr_feedback(self, x):
         """
         Infinite horizon LQR controller

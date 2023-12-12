@@ -3,7 +3,7 @@ import numpy as np
 # Global variables
 tf = 10  # tf 1 -> 100 iterations, 10 -> 1000
 #N = 3000
-N = 1000  # TODO: NOTE -- using different N to calculate iLQR and MPC
+N = 25  # TODO: NOTE -- using different N to calculate iLQR and MPC
 dt = 0.01
 
 # Skid Steer MPC start/end
@@ -16,7 +16,7 @@ dt = 0.01
 # skid steer iLQR start/end
 start = np.array([0, 0.01, 0])
 #end = np.array([-0.001, 0.001, 0])  # Runs in iLQR and MPC
-end = np.array([-0.01, 0.02, 0])  # Runs in iLQR and MPC
+end = np.array([0.01, 0.02, 0])  # Runs in iLQR and MPC
 #end = np.array([-0.02, 0.02, 0])  # Runs in iLQR; stalls in MPC
 #end = np.array([-0.03, 0.03, 0])  # takes too long
 #end = np.array([0.2, 0.8, 0])  # Works with N = 3000 (SLOWLY with iLQR; doesn't run in MPC)
@@ -24,7 +24,7 @@ end = np.array([-0.01, 0.02, 0])  # Runs in iLQR and MPC
 
 Q = .01 * np.eye(3)
 Q[2, 2] = 0  # Let system turn freely (no cost)
-R = np.eye(2) * 0.0000001
+R = np.eye(2) * 0.0000000049
 #R = np.eye(2) * 1e-6
 
 Qf = 1e2 * np.eye(3)
@@ -32,7 +32,7 @@ Qf[2, 2] = 0
 
 # TODO: Pick a guess that matches start and end
 #u_guess = [np.zeros((2,))] * (N - 1)
-guess = np.array([-0.1, 0.1])
+guess = np.array([0, 0.1])
 u_guess = [guess] * (N - 1)
 
 

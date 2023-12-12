@@ -18,6 +18,8 @@ def run_skid_iLQR(context):
     u_guess = context.u_guess
 
     x_sol, u_sol, K_sol = ilqr.calculate_optimal_trajectory(x0, u_guess)
+    print(f"x_sol: {x_sol}")
+    print(f"u_sol: {u_sol}")
 
     # Visualize the solution
     xx = np.array(x_sol)
